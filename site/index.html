@@ -802,13 +802,15 @@
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   /* ---------------- tela Acessos (só admin) ---------------- */
-  function baixarUsuarios(lista){
-    var txt = "// Pessoas com acesso ao painel. Gerado pela tela \"Acessos\".\n" +
-      "// Para publicar: salve este arquivo por cima de  site/usuarios.js , depois git push + git pull na VPS.\n" +
+  function textoUsuarios(lista){
+    return "// Pessoas com acesso ao painel. Gerado pela tela \"Acessos\".\n" +
+      "// Publicar: substituir site/usuarios.js por este conteudo -> git push + git pull na VPS.\n" +
       "window.USUARIOS = " + JSON.stringify(lista, null, 2) + ";\n";
+  }
+  function baixarTxt(lista){
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([txt], {type:'text/javascript;charset=utf-8'}));
-    a.download = 'usuarios.js';
+    a.href = URL.createObjectURL(new Blob([textoUsuarios(lista)], {type:'text/plain;charset=utf-8'}));
+    a.download = 'usuarios-js.txt';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
   }
@@ -828,16 +830,21 @@
     v.innerHTML =
       '<div class="topo"><div><h1>Acessos</h1>'+
         '<div class="sub">Quem pode abrir o painel. Você define a senha e envia para a pessoa.</div></div></div>'+
-      '<div class="escopo-nota">Depois de adicionar ou remover: clique em <b>Baixar usuarios.js</b>, '+
-        'salve o arquivo em <code>…\\ELEIÇÕES\\site\\usuarios.js</code> (por cima do que está lá) e '+
-        'publique (<code>git push</code> no PC + <code>git pull</code> na VPS) — ou me avise que eu publico.</div>'+
+      '<div class="escopo-nota">Adicione as pessoas abaixo. Depois, clique em <b>Copiar</b> e '+
+        '<b>cole o texto aqui no chat comigo</b> — eu publico e em segundos vale para todos. '+
+        '(Enquanto não publicar, o acesso novo só funciona neste navegador.)</div>'+
       '<div class="grade" style="grid-template-columns:1.3fr 1fr">'+
         '<div class="painel">'+
           '<h3>Pessoas com acesso <span class="tot">'+acessosEdit.length+'</span></h3>'+
           '<div class="scrollbox"><table class="tab"><thead><tr>'+
             '<th>Nome</th><th>Login</th><th class="num"></th></tr></thead><tbody>'+linhas+'</tbody></table></div>'+
-          '<div style="margin-top:14px"><button class="btn btn-verde" id="btBaixar">⬇ Baixar usuarios.js</button>'+
-          '<span class="mr" id="acStatus" style="margin-left:10px"></span></div>'+
+          '<h3 style="margin-top:16px">Texto para publicar</h3>'+
+          '<textarea id="acTexto" readonly rows="7" style="width:100%;font:12px/1.4 ui-monospace,Consolas,monospace;'+
+            'border:1px solid var(--linha);border-radius:8px;padding:8px;resize:vertical">'+esc(textoUsuarios(acessosEdit))+'</textarea>'+
+          '<div style="margin-top:8px;display:flex;gap:10px;align-items:center">'+
+            '<button class="btn btn-verde" id="btCopiar">📋 Copiar</button>'+
+            '<a id="btBaixar" style="cursor:pointer;color:#2f5597;text-decoration:underline;font-size:12.5px">baixar como .txt</a>'+
+            '<span class="mr" id="acStatus"></span></div>'+
         '</div>'+
         '<div class="painel">'+
           '<h3>Adicionar pessoa</h3>'+
@@ -871,8 +878,20 @@
       };
     });
     document.getElementById('btBaixar').onclick = function(){
-      baixarUsuarios(acessosEdit);
-      document.getElementById('acStatus').textContent = 'Arquivo baixado. Salve em site\\usuarios.js e publique.';
+      baixarTxt(acessosEdit);
+      document.getElementById('acStatus').textContent = 'Baixado (usuarios-js.txt). Renomeie para usuarios.js em site\\ e publique.';
+    };
+    document.getElementById('btCopiar').onclick = function(){
+      var txt = textoUsuarios(acessosEdit);
+      var ok = function(){ document.getElementById('acStatus').textContent = 'Copiado! Cole no chat com o Claude.'; };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(ok, function(){ selecionaTexto(); });
+      } else { selecionaTexto(); }
+      function selecionaTexto(){
+        var ta = document.getElementById('acTexto'); ta.focus(); ta.select();
+        try{ document.execCommand('copy'); ok(); }
+        catch(e){ document.getElementById('acStatus').textContent = 'Selecione o texto e copie (Ctrl+C).'; }
+      }
     };
   }
 

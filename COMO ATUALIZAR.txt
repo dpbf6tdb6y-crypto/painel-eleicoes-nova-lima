@@ -13,10 +13,10 @@ Login do painel:  usuario jucilei / senha jucilei
 DAR ACESSO A OUTRAS PESSOAS:
   Entre no painel como jucilei -> menu lateral "Acessos" (aparece so pro admin).
   Preencha Nome / Login / Senha -> Adicionar. Faca isso pra cada pessoa.
-  Clique em "Baixar usuarios.js", salve o arquivo por cima de  site/usuarios.js
-  e publique (git push no PC + git pull na VPS). Ai a pessoa entra com o
-  login e a senha que voce definiu.
-  (Enquanto nao publicar, o acesso novo so vale no seu navegador.)
+  Clique em "Copiar" e cole o texto no chat com o Claude -> ele publica.
+  (Ou faca voce: "baixar como .txt", renomeie o arquivo para usuarios.js,
+   salve em site/ por cima do que esta la, e git push no PC + git pull na VPS.)
+  Enquanto nao publicar, o acesso novo so vale no seu navegador.
 
 
 ------------------------------------------------
