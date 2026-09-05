@@ -61,10 +61,20 @@
   .btn-verde{background:var(--verde);color:#fff}
   .btn-cinza{background:#dde3ec;color:#33404f}
   .btn:hover{filter:brightness(1.05)}
+  .btn-limpar{background:#eef0f3;color:#9aa4b0;border:1px solid var(--linha);
+    display:inline-flex;align-items:center;gap:6px}
+  .btn-limpar.on{background:#e8452c;color:#fff;border-color:#e8452c;
+    box-shadow:0 3px 12px rgba(232,69,44,.4);animation:pulsaLimpar 1.8s ease-in-out infinite}
+  @keyframes pulsaLimpar{0%,100%{box-shadow:0 3px 12px rgba(232,69,44,.4)}50%{box-shadow:0 3px 18px rgba(232,69,44,.7)}}
 
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px;margin-bottom:12px}
   .escopo-nota{background:#eef6ee;border:1px solid #cfe6cf;color:#2f7d32;border-radius:8px;
     padding:8px 12px;font-size:12.5px;margin-bottom:16px}
+  .escopo-nota code{background:#dcefdc;padding:1px 4px;border-radius:3px}
+  .ac-lbl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--suave);margin:8px 0 3px}
+  a.lnk-rem{color:#c0392b;cursor:pointer;font-weight:600;font-size:12px}
+  a.lnk-rem:hover{text-decoration:underline}
 
   .filtros-ver{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;
     background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(20,40,80,.07);
@@ -83,6 +93,10 @@
   .kpi .val{font-size:23px;font-weight:700;margin-top:3px}
   .kpi.destaque{background:linear-gradient(120deg,var(--azul),#3f6fb0);color:#fff}
   .kpi.destaque .rot{color:#d7e3f6}
+  .kpi.clic{cursor:pointer;transition:box-shadow .12s,transform .12s}
+  .kpi.clic:hover{box-shadow:0 3px 12px rgba(20,40,80,.16);transform:translateY(-1px)}
+  .kpi.ativa{outline:2px solid var(--azul);outline-offset:-1px;background:#eef4fc}
+  .kpi.ativa .rot{color:var(--azul)}
 
   .grade{display:grid;grid-template-columns:1.15fr 1fr 0.9fr;gap:16px;align-items:start}
   @media(max-width:1150px){.grade{grid-template-columns:1fr 1fr}}
@@ -160,6 +174,7 @@
 
 <script src="chart.umd.min.js"></script>
 <script src="dados.js"></script>
+<script src="usuarios.js"></script>
 <script>
 (function(){
   "use strict";
@@ -172,21 +187,19 @@
   var m2M = D.micro_para_macro;
   var CORES = {azul:'#2f5597', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
 
-  var st = { rota:'menu', pageId:null, selCand:null, selMacro:null, selMicro:null, selPart:null, selStatus:null, busca:'', tudo:false, navAbertos:null };
+  var st = { rota:'menu', pageId:null, selCand:null, selMacro:null, selMicro:null, selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
+  var acessosEdit = null;   // cópia de trabalho da lista de usuários (tela Acessos)
   var buscaTimer=null;
   function limpaCharts(){
     try{ Object.values(Chart.instances||{}).forEach(function(c){ try{c.destroy();}catch(e){} }); }catch(e){}
   }
 
   document.getElementById('marca-sub').textContent = D.municipio || 'Nova Lima / MG';
-  document.getElementById('rodape').innerHTML =
-    'Fonte: '+ (D.fonte||'TRE-MG') +'<br>Dados de: '+ (D.gerado_em||'') +
-    '<br><a id="btSair" style="cursor:pointer;text-decoration:underline">Sair</a>';
-  var _sair = document.getElementById('btSair');
-  if(_sair) _sair.onclick = function(){ try{ localStorage.removeItem('pnl_auth'); }catch(e){} location.reload(); };
+  // o rodapé (com "Conectado: <nome>" e "Sair") é montado em entrar()
 
   function pg(id){ for(var i=0;i<D.paginas.length;i++) if(D.paginas[i].id===id) return D.paginas[i]; return null; }
-  function limparFiltros(){ st.selCand=null; st.selMacro=null; st.selMicro=null; st.selPart=null; st.selStatus=null; st.busca=''; st.tudo=false; }
+  function limparFiltros(){ st.selCand=null; st.selMacro=null; st.selMicro=null; st.selPart=null; st.selStatus=null; st.metrica='votos'; st.busca=''; st.tudo=false; }
+  function temAlgumFiltro(){ return !!(st.selCand||st.selMacro||st.selMicro||st.selPart||st.selStatus||st.busca||st.tudo||st.metrica!=='votos'); }
 
   /* ---------------- navegação lateral (accordion por ano) ---------------- */
   function anoDaPagina(p){
@@ -226,6 +239,9 @@
       h += '</div>';
     });
     h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>';
+    if(st.usuario && st.usuario.admin){
+      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos</a>';
+    }
     nav.innerHTML = h;
 
     nav.querySelectorAll('.nav-grp').forEach(function(g){
@@ -315,11 +331,12 @@
     });
     return MACROS.map(function(m){ return {regiao:m, votos:t[m]}; });
   }
-  // tabela de micro-regiao: sempre mostra todas, filtrando por candidato/status/partido (nao pela area)
+  // tabela de micro-regiao: filtra por candidato/status/partido E pela regiao/bairro selecionados
   function microTotais(p){
     var meta = metaCand(p), t={};
     p.cruzamento.forEach(function(r){
       if(st.selCand && r.c!==st.selCand) return;
+      if(!noArea(r.m)) return;
       if(!passaSP(meta, r.c)) return;
       t[r.m]=(t[r.m]||0)+r.v;
     });
@@ -347,6 +364,50 @@
     return Object.keys(t).map(function(k){ return {partido:k, votos:t[k]}; })
       .sort(function(a,b){ return b.votos-a.votos; });
   }
+
+  /* ---- métrica dos painéis do meio/direita: cartão de KPI clicável ---- */
+  var METRICAS = {
+    votos:          { rot:'Votos' },
+    aptos:          { rot:'Aptos',          fonte:'kpi', k:'a' },
+    comparecimento: { rot:'Comparecimento', fonte:'kpi', k:'c' },
+    abstencoes:     { rot:'Abstenções',     fonte:'kpi', k:'ab' },
+    nominais:       { rot:'Votos nominais', fonte:'kpi', k:'n' },
+    brancos:        { rot:'Brancos', fonte:'esp', alvos:['branco','voto branco'] },
+    nulos:          { rot:'Nulos',   fonte:'esp', alvos:['nulo','voto nulo'] }
+  };
+  function metricaAtual(){ return METRICAS[st.metrica] || METRICAS.votos; }
+  // macro: sempre as 9 regiões, valor conforme a métrica escolhida
+  function macroValores(p){
+    var met = metricaAtual();
+    if(!met.fonte) return macroTotais(p);
+    var t={}; MACROS.forEach(function(m){ t[m]=0; });
+    if(met.fonte==='kpi' && p.kpis_micro){
+      for(var mi in p.kpis_micro){ var M=m2M[mi]; if(M in t) t[M]+=(p.kpis_micro[mi][met.k]||0); }
+    } else {
+      p.cruzamento.forEach(function(r){
+        if(met.alvos.indexOf((r.c||'').toLowerCase())<0) return;
+        var M=m2M[r.m]; if(M in t) t[M]+=r.v;
+      });
+    }
+    return MACROS.map(function(m){ return {regiao:m, votos:t[m]}; });
+  }
+  // bairros: respeita a área (região/bairro) selecionada, valor conforme a métrica
+  function microValores(p){
+    var met = metricaAtual();
+    if(!met.fonte) return microTotais(p);
+    var t={};
+    if(met.fonte==='kpi' && p.kpis_micro){
+      for(var mi in p.kpis_micro){ if(noArea(mi)) t[mi]=(p.kpis_micro[mi][met.k]||0); }
+    } else {
+      p.cruzamento.forEach(function(r){
+        if(!noArea(r.m)) return;
+        if(met.alvos.indexOf((r.c||'').toLowerCase())<0) return;
+        t[r.m]=(t[r.m]||0)+r.v;
+      });
+    }
+    return Object.keys(t).map(function(k){ return {micro:k, votos:t[k]}; })
+      .sort(function(a,b){ return b.votos-a.votos; });
+  }
   function votosSelecao(p){
     if(temAreaFiltro()) return totalArea(p);
     if(st.selCand){
@@ -362,6 +423,7 @@
     montaNav();
     var v = document.getElementById('view');
     if(st.rota==='regioes') return renderRegioes(v);
+    if(st.rota==='acessos') return renderAcessos(v);
     if(st.rota==='pagina') return renderPagina(v, pg(st.pageId));
     return renderMenu(v);
   }
@@ -440,6 +502,7 @@
     if(st.selStatus) escP.push('Status: '+st.selStatus);
     if(st.selPart)   escP.push('Partido: '+st.selPart);
     if(st.selCand)   escP.push('Candidato: '+st.selCand);
+    if(st.metrica!=='votos') escP.push('Métrica: '+metricaAtual().rot);
     var escopo = escP.length ? escP.join(' &nbsp;·&nbsp; ') : 'Município inteiro';
 
     v.innerHTML =
@@ -447,16 +510,17 @@
         '<div><h1>'+p.titulo+'</h1><div class="sub">'+(D.municipio||'Nova Lima / MG')+
           ' · Fonte TRE-MG'+(p.tem_partido?' · '+p.candidatos.length+' candidatos':'')+
           ' &nbsp;•&nbsp; <b>'+escopo+'</b></div></div>'+
-        '<button class="btn btn-cinza" id="btLimpar">Limpar filtros</button>'+
+        '<button class="btn btn-limpar'+(temAlgumFiltro()?' on':'')+'" id="btLimpar">'+
+          (temAlgumFiltro()?'✕ Limpar seleção':'Sem filtros')+'</button>'+
       '</div>'+
       (temFV ? barraFiltrosVereador(p) : '')+
       '<div class="kpis">'+
-        kpi('Aptos'+rotArea, k.aptos)+
-        kpi('Comparecimento'+rotArea, k.comparecimento)+
-        kpi('Abstenções'+rotArea, k.abstencoes)+
-        kpi('Votos nominais'+rotArea, k.nominais)+
-        kpi('Brancos'+rotArea, brancos)+
-        kpi('Nulos'+rotArea, nulos)+
+        kpi('Aptos'+rotArea, k.aptos, false, 'aptos')+
+        kpi('Comparecimento'+rotArea, k.comparecimento, false, 'comparecimento')+
+        kpi('Abstenções'+rotArea, k.abstencoes, false, 'abstencoes')+
+        kpi('Votos nominais'+rotArea, k.nominais, false, 'nominais')+
+        kpi('Brancos'+rotArea, brancos, false, 'brancos')+
+        kpi('Nulos'+rotArea, nulos, false, 'nulos')+
         kpi('% Comparecimento', perc.toFixed(1).replace('.',',')+'%', true)+
         '<div class="kpi destaque"><div class="rot">Votos na seleção</div><div class="val" id="kvSel">—</div></div>'+
       '</div>'+
@@ -472,6 +536,13 @@
       (ehPartido ? '<div class="painel painel-full" id="pnPart"></div>' : '');
 
     document.getElementById('btLimpar').onclick = function(){ limparFiltros(); render(); };
+
+    v.querySelectorAll('.kpi[data-met]').forEach(function(el){
+      el.onclick = function(){
+        st.metrica = (st.metrica===el.dataset.met) ? 'votos' : el.dataset.met;
+        render();
+      };
+    });
 
     if(temFV){
       v.querySelectorAll('.filtros-ver [data-fst]').forEach(function(bt){
@@ -535,13 +606,16 @@
     }
 
     /* ----- painel do meio: regiões (macro) ----- */
-    var macros = macroTotais(p);
+    var rotMet = metricaAtual().rot;
+    var ehVotos = (st.metrica === 'votos');
+    var macros = macroValores(p);
     var totMac = macros.reduce(function(a,x){return a+x.votos;},0);
     var alvoMac = st.selMacro || (st.selMicro ? m2M[st.selMicro] : null);
     document.getElementById('pnMeio').innerHTML =
-      '<h3>Votos por região'+(st.selCand?' — '+st.selCand:(st.selPart?' — '+st.selPart:''))+
+      '<h3>'+rotMet+' por região'+(ehVotos && st.selCand?' — '+st.selCand:(ehVotos && st.selPart?' — '+st.selPart:''))+
         ' <span class="tot">total '+fmt.format(totMac)+'</span></h3>'+
-      '<div class="dica">Clique numa barra para ver os números daquela região.</div>'+
+      '<div class="dica">'+(ehVotos?'Clique numa barra para ver os números daquela região.'
+        :'Mostrando <b>'+rotMet+'</b>. Clique de novo no cartão “'+rotMet+'” para voltar aos votos.')+'</div>'+
       (st.selMacro?'<span class="filtro-ativo" id="fMac">Região: '+st.selMacro+' ✕</span>':'')+
       '<div class="chart-wrap" style="height:'+alturaGrafico(macros.length)+'px"><canvas id="mChart"></canvas></div>';
     desenhaBarras('mChart', macros.map(function(x){return x.regiao;}), macros.map(function(x){return x.votos;}),
@@ -550,7 +624,7 @@
     if(st.selMacro) document.getElementById('fMac').onclick=function(){ st.selMacro=null; render(); };
 
     /* ----- painel direito: micro-regiões (tabela) ----- */
-    var micros = microTotais(p);
+    var micros = microValores(p);
     var totMi = micros.reduce(function(a,x){return a+x.votos;},0);
     var linhas = micros.map(function(x){
       var sel = (x.micro===st.selMicro);
@@ -559,10 +633,10 @@
         '<td class="num">'+fmt.format(x.votos)+'</td></tr>';
     }).join('');
     document.getElementById('pnDir').innerHTML =
-      '<h3>Votos por micro-região (bairro) <span class="tot">total '+fmt.format(totMi)+'</span></h3>'+
+      '<h3>'+rotMet+' por bairro <span class="tot">total '+fmt.format(totMi)+'</span></h3>'+
       '<div class="dica">Clique num bairro para ver os números só dele.</div>'+
       (st.selMicro?'<span class="filtro-ativo" id="fMic">Bairro: '+st.selMicro+' ✕</span>':'')+
-      '<div class="scrollbox"><table class="tab"><thead><tr><th>Micro-região</th><th class="num">Votos</th></tr></thead>'+
+      '<div class="scrollbox"><table class="tab"><thead><tr><th>Micro-região</th><th class="num">'+rotMet+'</th></tr></thead>'+
       '<tbody>'+linhas+'</tbody>'+
       '<tfoot><tr><td>Total</td><td class="num">'+fmt.format(totMi)+'</td></tr></tfoot></table></div>';
     document.querySelectorAll('#pnDir tr.clic').forEach(function(tr){
@@ -627,8 +701,10 @@
     return {legenda:legenda, vereadores:veread, totalVereadores:totV, total:legenda+totV, eleitos:eleitos};
   }
 
-  function kpi(rot,val,jaTexto){
-    return '<div class="kpi"><div class="rot">'+rot+'</div><div class="val">'+
+  function kpi(rot,val,jaTexto,met){
+    var cls = 'kpi' + (met ? ' clic' : '') + (met && st.metrica===met ? ' ativa' : '');
+    return '<div class="'+cls+'"'+(met?' data-met="'+met+'" title="Clique para ver por região e bairro"':'')+
+      '><div class="rot">'+rot+'</div><div class="val">'+
       (jaTexto?val:(val==null?'—':fmt.format(val)))+'</div></div>';
   }
 
@@ -655,7 +731,14 @@
     }
   };
 
-  function alturaGrafico(n){ return Math.max(140, n*23 + 26); }
+  function alturaGrafico(n){ return Math.max(140, n*25 + 26); }
+
+  // "Nome  (PARTIDO)"  ->  ["Nome", "(PARTIDO)"]  (2 linhas no eixo Y)
+  function quebraRotulo(s){
+    s = String(s);
+    var m = s.match(/^(.*?)\s+\((.+)\)\s*$/);
+    return m ? [m[1], '(' + m[2] + ')'] : s;
+  }
 
   function desenhaBarras(canvasId, labels, valores, cores, onClick){
     var el = document.getElementById(canvasId);
@@ -668,11 +751,27 @@
         indexAxis:'y', responsive:true, maintainAspectRatio:false,
         layout:{ padding:{ right:58, left:2, top:2, bottom:2 } },
         animation:{ duration:250 },
-        plugins:{ legend:{display:false},
-          tooltip:{ callbacks:{ label:function(c){ return fmt.format(c.raw)+' votos'; } } } },
+        events:['click'],
+        plugins:{ legend:{display:false}, tooltip:{ enabled:false } },
         scales:{
           x:{ ticks:{ callback:function(v){ return fmt.format(v); }, font:{size:10} }, grid:{color:'#eef1f5'} },
-          y:{ ticks:{ font:{size:11}, autoSkip:false }, grid:{display:false} }
+          y:{
+            ticks:{ font:{size:10.5}, autoSkip:false,
+              callback:function(v){ return quebraRotulo(this.getLabelForValue(v)); } },
+            grid:{display:false},
+            afterFit:function(sc){
+              // reserva largura suficiente pro maior nome (1a linha), no máximo metade do gráfico
+              var ctx = sc.chart.ctx; ctx.save();
+              ctx.font = '10.5px "Segoe UI",system-ui,sans-serif';
+              var w = 0;
+              labels.forEach(function(l){
+                var t = String(l).replace(/\s+\(.+\)\s*$/, '');
+                w = Math.max(w, ctx.measureText(t).width);
+              });
+              ctx.restore();
+              sc.width = Math.max(sc.width, Math.min(Math.ceil(w) + 16, sc.chart.width * 0.5));
+            }
+          }
         },
         onClick:function(evt,els){ if(els&&els.length&&onClick) onClick(els[0].index); }
       },
@@ -700,30 +799,134 @@
   }
 
   function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  /* ---------------- controle de acesso (senha) ---------------- */
-  // Cadeado simples do lado do navegador. Para trocar as credenciais:
-  // gere o hash de cada texto com a função _h() abaixo e substitua os valores.
+  /* ---------------- tela Acessos (só admin) ---------------- */
+  function baixarUsuarios(lista){
+    var txt = "// Pessoas com acesso ao painel. Gerado pela tela \"Acessos\".\n" +
+      "// Para publicar: salve este arquivo por cima de  site/usuarios.js , depois git push + git pull na VPS.\n" +
+      "window.USUARIOS = " + JSON.stringify(lista, null, 2) + ";\n";
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([txt], {type:'text/javascript;charset=utf-8'}));
+    a.download = 'usuarios.js';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  }
+
+  function renderAcessos(v){
+    if(!(st.usuario && st.usuario.admin)){ v.innerHTML = '<p style="padding:20px">Área restrita.</p>'; return; }
+    if(!acessosEdit) acessosEdit = JSON.parse(JSON.stringify(listaUsuarios()));
+
+    var linhas = acessosEdit.map(function(u, i){
+      var eu = (u.login === st.usuario.login);
+      return '<tr><td>'+esc(u.nome)+'</td><td><code>'+esc(u.login)+'</code>'+
+        (u.admin?' <span class="badge b-Eleito">admin</span>':'')+'</td>'+
+        '<td class="num">'+ (eu||u.admin ? '<span class="mr">—</span>' :
+          '<a class="lnk-rem" data-i="'+i+'">remover</a>') + '</td></tr>';
+    }).join('');
+
+    v.innerHTML =
+      '<div class="topo"><div><h1>Acessos</h1>'+
+        '<div class="sub">Quem pode abrir o painel. Você define a senha e envia para a pessoa.</div></div></div>'+
+      '<div class="escopo-nota">Depois de adicionar ou remover: clique em <b>Baixar usuarios.js</b>, '+
+        'salve o arquivo em <code>…\\ELEIÇÕES\\site\\usuarios.js</code> (por cima do que está lá) e '+
+        'publique (<code>git push</code> no PC + <code>git pull</code> na VPS) — ou me avise que eu publico.</div>'+
+      '<div class="grade" style="grid-template-columns:1.3fr 1fr">'+
+        '<div class="painel">'+
+          '<h3>Pessoas com acesso <span class="tot">'+acessosEdit.length+'</span></h3>'+
+          '<div class="scrollbox"><table class="tab"><thead><tr>'+
+            '<th>Nome</th><th>Login</th><th class="num"></th></tr></thead><tbody>'+linhas+'</tbody></table></div>'+
+          '<div style="margin-top:14px"><button class="btn btn-verde" id="btBaixar">⬇ Baixar usuarios.js</button>'+
+          '<span class="mr" id="acStatus" style="margin-left:10px"></span></div>'+
+        '</div>'+
+        '<div class="painel">'+
+          '<h3>Adicionar pessoa</h3>'+
+          '<div class="dica">A pessoa entra com o <b>login</b> e a <b>senha</b> que você definir aqui.</div>'+
+          '<label class="ac-lbl">Nome</label><input class="barra-busca" id="acNome" placeholder="Ex.: Maria Souza">'+
+          '<label class="ac-lbl">Login</label><input class="barra-busca" id="acLogin" placeholder="Ex.: maria" autocapitalize="none" spellcheck="false">'+
+          '<label class="ac-lbl">Senha</label><input class="barra-busca" id="acSenha" placeholder="a senha que você vai enviar">'+
+          '<button class="btn btn-verde" id="btAdd" style="margin-top:6px">Adicionar</button>'+
+          '<div class="lg-erro" id="acErro" hidden></div>'+
+        '</div>'+
+      '</div>';
+
+    document.getElementById('btAdd').onclick = function(){
+      var nome = (document.getElementById('acNome').value||'').trim();
+      var login = (document.getElementById('acLogin').value||'').trim().toLowerCase();
+      var senha = (document.getElementById('acSenha').value||'');
+      var err = document.getElementById('acErro');
+      if(!nome || !login || !senha){ err.textContent='Preencha nome, login e senha.'; err.hidden=false; return; }
+      if(!/^[a-z0-9._-]{3,}$/.test(login)){ err.textContent='Login: use só letras/números/ponto/hífen, mínimo 3.'; err.hidden=false; return; }
+      if(acessosEdit.some(function(u){ return u.login===login; })){ err.textContent='Já existe alguém com esse login.'; err.hidden=false; return; }
+      acessosEdit.push({ nome:nome, login:login, h:_h(login+'::'+senha) });
+      window.USUARIOS = acessosEdit.slice();   // vale já neste navegador (some ao recarregar se não publicar)
+      render();
+    };
+    v.querySelectorAll('.lnk-rem').forEach(function(a){
+      a.onclick = function(){
+        var i = +a.dataset.i;
+        if(confirm('Remover o acesso de "'+acessosEdit[i].nome+'"?')){
+          acessosEdit.splice(i,1); window.USUARIOS = acessosEdit.slice(); render();
+        }
+      };
+    });
+    document.getElementById('btBaixar').onclick = function(){
+      baixarUsuarios(acessosEdit);
+      document.getElementById('acStatus').textContent = 'Arquivo baixado. Salve em site\\usuarios.js e publique.';
+    };
+  }
+
+  /* ---------------- controle de acesso (multiusuário) ---------------- */
+  // Cadeado simples do lado do navegador. A lista de pessoas fica em usuarios.js,
+  // editável pela tela "Acessos". Hash de cada pessoa = _h(login + "::" + senha).
   function _h(s){ var x=5381; for(var i=0;i<s.length;i++) x=((x<<5)+x+s.charCodeAt(i))>>>0; return x.toString(16); }
-  var ACESSO = { user:'fb833d6a', pass:'fb833d6a' };   // usuário: jucilei  /  senha: jucilei
 
-  function entrar(){
+  function listaUsuarios(){
+    var l = window.USUARIOS;
+    if(l && l.length) return l;
+    // reserva: se usuarios.js nao carregar, mantem o acesso padrao
+    return [{ nome:'Jucilei Nunes Ferreira', login:'jucilei', h:'b2b769e3', admin:true }];
+  }
+  function conferir(login, senha){
+    var alvo = _h(String(login||'').trim().toLowerCase() + '::' + String(senha||''));
+    var l = listaUsuarios();
+    for(var i=0;i<l.length;i++) if(l[i].h === alvo) return l[i];
+    return null;
+  }
+  function usuarioPorLogin(login){
+    var l = listaUsuarios();
+    for(var i=0;i<l.length;i++) if(l[i].login === login) return l[i];
+    return null;
+  }
+
+  function entrar(usuario){
+    st.usuario = usuario || null;
+    var rp = document.getElementById('rodape');
+    if(rp && st.usuario){
+      rp.innerHTML = 'Conectado: <b>'+esc(st.usuario.nome||st.usuario.login)+'</b>'+
+        '<br>Fonte: '+ (D.fonte||'TRE-MG') +'<br>Dados de: '+ (D.gerado_em||'') +
+        '<br><a id="btSair" style="cursor:pointer;text-decoration:underline">Sair</a>';
+      var s = document.getElementById('btSair');
+      if(s) s.onclick = function(){ try{ localStorage.removeItem('pnl_auth'); }catch(e){} location.reload(); };
+    }
     document.getElementById('login').hidden = true;
     document.getElementById('app').hidden = false;
     render();
   }
-  var jaEntrou = false;
-  try{ jaEntrou = (localStorage.getItem('pnl_auth') === '1'); }catch(e){}
-  if(jaEntrou){
-    entrar();
+
+  var loginSalvo = null;
+  try{ loginSalvo = localStorage.getItem('pnl_auth'); }catch(e){}
+  var uSalvo = loginSalvo && loginSalvo !== '1' ? usuarioPorLogin(loginSalvo) : null;
+  if(uSalvo){
+    entrar(uSalvo);
   } else {
+    try{ if(loginSalvo) localStorage.removeItem('pnl_auth'); }catch(e){}
     document.getElementById('loginForm').addEventListener('submit', function(ev){
       ev.preventDefault();
-      var u = (document.getElementById('lgUser').value || '').trim().toLowerCase();
-      var p = (document.getElementById('lgPass').value || '');
-      if(_h(u) === ACESSO.user && _h(p) === ACESSO.pass){
-        try{ localStorage.setItem('pnl_auth','1'); }catch(e){}
-        entrar();
+      var u = conferir(document.getElementById('lgUser').value, document.getElementById('lgPass').value);
+      if(u){
+        try{ localStorage.setItem('pnl_auth', u.login); }catch(e){}
+        entrar(u);
       } else {
         document.getElementById('lgErro').hidden = false;
       }

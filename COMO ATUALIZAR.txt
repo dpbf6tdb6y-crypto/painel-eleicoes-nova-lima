@@ -9,8 +9,14 @@ Estrutura:
   planilhas/       -> Arquivo das eleicoes.xlsx  (fonte dos dados, do TRE-MG)
 
 Login do painel:  usuario jucilei / senha jucilei
-(dentro de site/index.html, variavel ACESSO. Trocar: rodar _h("nova") no console
- do navegador, F12, e colar o hash.)
+
+DAR ACESSO A OUTRAS PESSOAS:
+  Entre no painel como jucilei -> menu lateral "Acessos" (aparece so pro admin).
+  Preencha Nome / Login / Senha -> Adicionar. Faca isso pra cada pessoa.
+  Clique em "Baixar usuarios.js", salve o arquivo por cima de  site/usuarios.js
+  e publique (git push no PC + git pull na VPS). Ai a pessoa entra com o
+  login e a senha que voce definiu.
+  (Enquanto nao publicar, o acesso novo so vale no seu navegador.)
 
 
 ------------------------------------------------
