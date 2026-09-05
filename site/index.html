@@ -927,6 +927,26 @@
     return null;
   }
 
+  function sair(motivo){
+    try{ localStorage.removeItem('pnl_auth'); }catch(e){}
+    try{ if(motivo) sessionStorage.setItem('pnl_saida', motivo); }catch(e){}
+    location.reload();
+  }
+
+  /* sai sozinho após 5 min sem atividade */
+  var INATIV_MS = 5 * 60 * 1000, inativTimer = null, ultimoToque = 0;
+  function armarInatividade(){
+    if(!st.usuario) return;
+    var agora = Date.now();
+    if(agora - ultimoToque < 1000) return;   // não re-arma a cada pixel do mouse
+    ultimoToque = agora;
+    clearTimeout(inativTimer);
+    inativTimer = setTimeout(function(){ sair('inatividade'); }, INATIV_MS);
+  }
+  ['mousemove','mousedown','keydown','scroll','touchstart','click','wheel'].forEach(function(ev){
+    document.addEventListener(ev, armarInatividade, {passive:true});
+  });
+
   function entrar(usuario){
     st.usuario = usuario || null;
     var rp = document.getElementById('rodape');
@@ -935,10 +955,11 @@
         '<br>Fonte: '+ (D.fonte||'TRE-MG') +'<br>Dados de: '+ (D.gerado_em||'') +
         '<br><a id="btSair" style="cursor:pointer;text-decoration:underline">Sair</a>';
       var s = document.getElementById('btSair');
-      if(s) s.onclick = function(){ try{ localStorage.removeItem('pnl_auth'); }catch(e){} location.reload(); };
+      if(s) s.onclick = function(){ sair(); };
     }
     document.getElementById('login').hidden = true;
     document.getElementById('app').hidden = false;
+    ultimoToque = 0; armarInatividade();
     render();
   }
 
@@ -961,6 +982,14 @@
     entrar(uSalvo);
   } else {
     try{ if(loginSalvo) localStorage.removeItem('pnl_auth'); }catch(e){}
+    try{
+      if(sessionStorage.getItem('pnl_saida') === 'inatividade'){
+        var e = document.getElementById('lgErro');
+        e.textContent = 'Sessão encerrada por inatividade (5 min). Entre novamente.';
+        e.style.color = 'var(--suave)'; e.hidden = false;
+      }
+      sessionStorage.removeItem('pnl_saida');
+    }catch(e){}
     document.getElementById('loginForm').addEventListener('submit', function(ev){
       ev.preventDefault();
       var u = conferir(document.getElementById('lgUser').value, document.getElementById('lgPass').value);
