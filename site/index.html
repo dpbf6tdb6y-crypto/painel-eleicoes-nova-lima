@@ -28,9 +28,15 @@
   #login p{margin:0 0 18px;color:var(--suave);font-size:12.5px}
   #login input{width:100%;padding:10px 12px;border:1px solid var(--linha);border-radius:8px;
     font-size:14px;margin-bottom:10px}
-  #login button{width:100%;padding:11px;border:0;border-radius:8px;background:var(--verde);color:#fff;
+  #login .pw-wrap{position:relative}
+  #login .pw-wrap input{padding-right:42px}
+  #login .pw-tgl{position:absolute;right:4px;top:4px;bottom:14px;width:34px;padding:0;margin:0;
+    background:transparent;border:0;cursor:pointer;font-size:17px;line-height:1;opacity:.55}
+  #login .pw-tgl:hover{opacity:1;filter:none}
+  #login .pw-tgl.on{opacity:1}
+  #login button[type=submit]{width:100%;padding:11px;border:0;border-radius:8px;background:var(--verde);color:#fff;
     font-size:14px;font-weight:700;cursor:pointer}
-  #login button:hover{filter:brightness(1.05)}
+  #login button[type=submit]:hover{filter:brightness(1.05)}
   #login .lg-erro{color:#c0392b;font-size:12.5px;margin-top:10px}
 
   /* ---------- sidebar ---------- */
@@ -158,7 +164,10 @@
     <h1>Painel Eleições — Nova Lima</h1>
     <p>Acesso restrito. Informe usuário e senha.</p>
     <input id="lgUser" name="username" placeholder="Usuário" autocomplete="username" autocapitalize="none" spellcheck="false">
-    <input id="lgPass" name="password" type="password" placeholder="Senha" autocomplete="current-password">
+    <div class="pw-wrap">
+      <input id="lgPass" name="password" type="password" placeholder="Senha" autocomplete="current-password">
+      <button type="button" id="lgPassTgl" class="pw-tgl" aria-label="Mostrar senha" title="Mostrar/ocultar senha">👁</button>
+    </div>
     <button type="submit">Entrar</button>
     <div class="lg-erro" id="lgErro" hidden>Usuário ou senha incorretos.</div>
   </form>
@@ -932,6 +941,18 @@
     document.getElementById('app').hidden = false;
     render();
   }
+
+  (function(){
+    var tgl = document.getElementById('lgPassTgl'), inp = document.getElementById('lgPass');
+    if(tgl && inp) tgl.onclick = function(){
+      var ver = inp.type === 'password';
+      inp.type = ver ? 'text' : 'password';
+      tgl.textContent = ver ? '🙈' : '👁';
+      tgl.classList.toggle('on', ver);
+      tgl.setAttribute('aria-label', ver ? 'Ocultar senha' : 'Mostrar senha');
+      inp.focus();
+    };
+  })();
 
   var loginSalvo = null;
   try{ loginSalvo = localStorage.getItem('pnl_auth'); }catch(e){}
