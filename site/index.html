@@ -105,8 +105,9 @@
   .kpi.ativa .rot{color:var(--azul)}
 
   .grade{display:grid;grid-template-columns:1.15fr 1fr 0.9fr;gap:16px;align-items:start}
+  .grade.grade-2{grid-template-columns:1.35fr 1fr}
   @media(max-width:1150px){.grade{grid-template-columns:1fr 1fr}}
-  @media(max-width:820px){.grade{grid-template-columns:1fr}}
+  @media(max-width:820px){.grade,.grade.grade-2{grid-template-columns:1fr}}
   .painel{background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(20,40,80,.07);
     padding:14px 16px;min-width:0}
   .painel h3{margin:0 0 4px;font-size:14px}
@@ -537,12 +538,12 @@
         (st.selMicro?('bairro '+st.selMicro):('região '+st.selMacro))+'</b>'+
         (st.selCand?(' · candidato <b>'+st.selCand+'</b>'):'')+
         '. Clique de novo no item selecionado ou em “Limpar filtros” para voltar.</div>':'')+
-      '<div class="grade">'+
-        '<div class="painel" id="pnEsq"></div>'+
+      '<div class="grade'+(st.metrica!=='votos'?' grade-2':'')+'">'+
+        (st.metrica!=='votos' ? '' : '<div class="painel" id="pnEsq"></div>')+
         '<div class="painel" id="pnMeio"></div>'+
         '<div class="painel" id="pnDir"></div>'+
       '</div>'+
-      (ehPartido ? '<div class="painel painel-full" id="pnPart"></div>' : '');
+      (ehPartido && st.metrica==='votos' ? '<div class="painel painel-full" id="pnPart"></div>' : '');
 
     document.getElementById('btLimpar').onclick = function(){ limparFiltros(); render(); };
 
@@ -567,9 +568,9 @@
       if(fvl) fvl.onclick = function(){ st.selStatus=null; st.selPart=null; render(); };
     }
 
-    /* ----- painel esquerdo: candidatos (ou partidos) ----- */
+    /* ----- painel esquerdo: candidatos (ou partidos) — só no modo "votos" ----- */
     var pnEsq = document.getElementById('pnEsq');
-    if(ehPartido){
+    if(ehPartido && pnEsq){
       var parts = partidoTotais(p);
       var totParts = parts.reduce(function(a,x){return a+x.votos;},0);
       pnEsq.innerHTML = '<h3>Votos por partido <span class="tot">total '+fmt.format(totParts)+'</span></h3>'+
@@ -580,7 +581,7 @@
         parts.map(function(x){ return x.partido===st.selPart?CORES.verde:CORES.azul; }),
         function(i){ st.selPart = (st.selPart===parts[i].partido)?null:parts[i].partido; st.selCand=null; render(); });
       if(st.selPart) document.getElementById('fPart').onclick=function(){ st.selPart=null; render(); };
-    } else {
+    } else if(pnEsq) {
       var cands = candFiltrados(p);
       var totCand = cands.reduce(function(a,x){return a+x.votos;},0);
       var limite = st.tudo ? cands.length : Math.min(cands.length, 22);
@@ -626,7 +627,7 @@
       '<div class="dica">'+(ehVotos?'Clique numa barra para ver os números daquela região.'
         :'Mostrando <b>'+rotMet+'</b>. Clique de novo no cartão “'+rotMet+'” para voltar aos votos.')+'</div>'+
       (st.selMacro?'<span class="filtro-ativo" id="fMac">Região: '+st.selMacro+' ✕</span>':'')+
-      '<div class="chart-wrap" style="height:'+alturaGrafico(macros.length)+'px"><canvas id="mChart"></canvas></div>';
+      '<div class="chart-wrap" style="height:'+(ehVotos?alturaGrafico(macros.length):Math.round(alturaGrafico(macros.length)*1.5))+'px"><canvas id="mChart"></canvas></div>';
     desenhaBarras('mChart', macros.map(function(x){return x.regiao;}), macros.map(function(x){return x.votos;}),
       macros.map(function(x){ return x.regiao===alvoMac?CORES.verde:CORES.azul; }),
       function(i){ var r=macros[i].regiao; st.selMacro=(st.selMacro===r)?null:r; st.selMicro=null; render(); });
@@ -654,7 +655,7 @@
     if(st.selMicro) document.getElementById('fMic').onclick=function(){ st.selMicro=null; render(); };
 
     /* ----- painel inferior (só na página de partido): vereadores + legenda ----- */
-    if(ehPartido){
+    if(ehPartido && document.getElementById('pnPart')){
       var pnPart = document.getElementById('pnPart');
       if(!st.selPart){
         pnPart.innerHTML = '<h3>Vereadores e legenda por partido</h3>'+
