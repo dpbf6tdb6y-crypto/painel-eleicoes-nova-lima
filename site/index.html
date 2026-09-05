@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Eleições — Nova Lima</title>
+<style>
+  :root{
+    --azul:#2f5597; --azul-esc:#22406f; --verde:#46b649; --verde-cl:#54c15c;
+    --bg:#eef1f5; --card:#ffffff; --texto:#1f2733; --suave:#6b7683;
+    --linha:#e4e8ee; --amarelo:#f2c200;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    background:var(--bg);color:var(--texto);font-size:14px}
+  a{color:inherit}
+  [hidden]{display:none!important}
+  #app{display:flex;min-height:100vh}
+
+  /* ---------- tela de login ---------- */
+  #login{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(130deg,var(--azul),var(--verde));padding:20px}
+  #login form{background:#fff;border-radius:14px;padding:30px 28px;width:100%;max-width:340px;
+    box-shadow:0 10px 40px rgba(0,0,0,.25);text-align:center}
+  #login .lg-icone{font-size:44px}
+  #login h1{font-size:19px;margin:10px 0 2px;color:var(--texto)}
+  #login p{margin:0 0 18px;color:var(--suave);font-size:12.5px}
+  #login input{width:100%;padding:10px 12px;border:1px solid var(--linha);border-radius:8px;
+    font-size:14px;margin-bottom:10px}
+  #login button{width:100%;padding:11px;border:0;border-radius:8px;background:var(--verde);color:#fff;
+    font-size:14px;font-weight:700;cursor:pointer}
+  #login button:hover{filter:brightness(1.05)}
+  #login .lg-erro{color:#c0392b;font-size:12.5px;margin-top:10px}
+
+  /* ---------- sidebar ---------- */
+  .sidebar{width:250px;flex:0 0 250px;background:var(--azul-esc);color:#dfe6f2;
+    display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .sidebar .marca{padding:18px 16px;font-weight:700;font-size:15px;line-height:1.25;
+    background:linear-gradient(120deg,var(--azul),var(--verde));color:#fff}
+  .sidebar .marca small{display:block;font-weight:500;opacity:.9;font-size:11px;margin-top:3px}
+  .nav-sec{padding:10px 14px 4px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:#8ea3c7}
+  .nav a{display:block;padding:8px 16px;font-size:13px;cursor:pointer;border-left:3px solid transparent}
+  .nav a:hover{background:rgba(255,255,255,.07)}
+  .nav a.ativo{background:rgba(255,255,255,.13);border-left-color:var(--verde-cl);font-weight:600;color:#fff}
+  .nav-grp{padding:11px 16px 9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:#9fb2d1;cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px;font-weight:700}
+  .nav-grp:hover{color:#e2e9f5;background:rgba(255,255,255,.05)}
+  .nav-grp-seta{font-size:9px;transition:transform .15s ease}
+  .nav-grp.aberto .nav-grp-seta{transform:rotate(90deg)}
+  .nav-sub a{padding-left:28px;font-size:12.5px}
+  .sidebar .rodape{margin-top:auto;padding:14px 16px;font-size:11px;color:#8ea3c7;border-top:1px solid rgba(255,255,255,.08)}
+
+  /* ---------- conteudo ---------- */
+  main{flex:1;min-width:0;padding:22px 26px 40px}
+  .topo{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+  .topo h1{font-size:20px;margin:0}
+  .topo .sub{color:var(--suave);font-size:12.5px;margin-top:2px}
+  .btn{border:0;border-radius:7px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600}
+  .btn-verde{background:var(--verde);color:#fff}
+  .btn-cinza{background:#dde3ec;color:#33404f}
+  .btn:hover{filter:brightness(1.05)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px;margin-bottom:12px}
+  .escopo-nota{background:#eef6ee;border:1px solid #cfe6cf;color:#2f7d32;border-radius:8px;
+    padding:8px 12px;font-size:12.5px;margin-bottom:16px}
+
+  .filtros-ver{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;
+    background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(20,40,80,.07);
+    padding:10px 14px;margin-bottom:14px}
+  .filtros-ver .fgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .filtros-ver .flab{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave);margin-right:2px}
+  .fchip{border:1px solid var(--linha);background:#f4f6f9;color:#33404f;border-radius:20px;
+    padding:5px 12px;font-size:12.5px;cursor:pointer;font-weight:600}
+  .fchip:hover{background:#e9edf3}
+  .fchip.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  .fchip.lisa{background:transparent;border-color:transparent;color:#2f5597;font-weight:600}
+  .filtros-ver select{border:1px solid var(--linha);border-radius:7px;padding:5px 8px;font-size:12.5px;background:#fff}
+  td .mrx{display:block;font-size:10.5px;color:#9aa7b5}
+  .kpi{background:var(--card);border-radius:10px;padding:13px 15px;box-shadow:0 1px 3px rgba(20,40,80,.07)}
+  .kpi .rot{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
+  .kpi .val{font-size:23px;font-weight:700;margin-top:3px}
+  .kpi.destaque{background:linear-gradient(120deg,var(--azul),#3f6fb0);color:#fff}
+  .kpi.destaque .rot{color:#d7e3f6}
+
+  .grade{display:grid;grid-template-columns:1.15fr 1fr 0.9fr;gap:16px;align-items:start}
+  @media(max-width:1150px){.grade{grid-template-columns:1fr 1fr}}
+  @media(max-width:820px){.grade{grid-template-columns:1fr}}
+  .painel{background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(20,40,80,.07);
+    padding:14px 16px;min-width:0}
+  .painel h3{margin:0 0 4px;font-size:14px}
+  .painel h3 .tot{font-weight:500;font-size:11.5px;color:var(--suave);background:#f0f3f7;
+    border-radius:20px;padding:1px 9px;margin-left:6px;white-space:nowrap}
+  .painel-full{margin-top:16px}
+  .pdet-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 12px}
+  .pdet-card{background:#f5f8fc;border:1px solid var(--linha);border-radius:8px;padding:9px 12px}
+  .pdet-card .rot{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
+  .pdet-card .val{font-size:19px;font-weight:700;margin-top:2px}
+  .painel .dica{font-size:11.5px;color:var(--suave);margin-bottom:10px}
+  .painel .filtro-ativo{display:inline-block;background:#eaf6ea;color:#2f7d32;border:1px solid #bfe3c0;
+    border-radius:20px;padding:2px 10px;font-size:11.5px;margin-bottom:8px;cursor:pointer}
+  .scrollbox{max-height:440px;overflow-y:auto;overflow-x:hidden}
+  .barra-busca{width:100%;padding:7px 10px;border:1px solid var(--linha);border-radius:7px;
+    font-size:13px;margin-bottom:10px}
+  .chart-wrap{position:relative}
+
+  table.tab{width:100%;border-collapse:collapse;font-size:13px}
+  table.tab th,table.tab td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--linha)}
+  table.tab td.num,table.tab th.num{text-align:right;font-variant-numeric:tabular-nums}
+  table.tab tbody tr:hover{background:#f5f8fc}
+  table.tab tr.clic{cursor:pointer}
+  table.tab tr.sel{background:#eaf6ea}
+  table.tab tfoot td{font-weight:700;border-top:2px solid var(--linha)}
+
+  .badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600}
+  .b-Eleito{background:#e3f5e3;color:#2f7d32}
+  .b-Suplente{background:#eef0f3;color:#5b6673}
+  .b-Legenda{background:#e5eefb;color:#2f5597}
+  .b-Branco,.b-Nulo{background:#f4f4f4;color:#8a939e}
+
+  /* tela do menu principal (apresentação) */
+  .capa{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;min-height:calc(100vh - 62px);max-width:820px;margin:0 auto;padding:20px}
+  .capa .icone{font-size:64px}
+  .capa h1{font-size:44px;margin:18px 0 10px;line-height:1.12;color:var(--texto)}
+  .capa .anos{font-size:20px;color:var(--azul);margin:0 0 22px}
+  .capa p{color:var(--suave);margin:3px 0;font-size:16px}
+  .capa .dica-menu{margin-top:26px;font-size:14px;color:var(--verde);font-weight:600}
+  @media(max-width:640px){ .capa h1{font-size:30px} }
+
+  .reg-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .reg-card{background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(20,40,80,.07);padding:14px 16px}
+  .reg-card h3{margin:0 0 8px;font-size:15px;color:var(--azul)}
+  .reg-card ul{margin:0;padding-left:18px}
+  .reg-card li{margin:3px 0}
+  .reg-card .mr{font-size:11.5px;color:var(--suave)}
+</style>
+</head>
+<body>
+<div id="login">
+  <form id="loginForm" autocomplete="on">
+    <div class="lg-icone">🗳️</div>
+    <h1>Painel Eleições — Nova Lima</h1>
+    <p>Acesso restrito. Informe usuário e senha.</p>
+    <input id="lgUser" name="username" placeholder="Usuário" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <input id="lgPass" name="password" type="password" placeholder="Senha" autocomplete="current-password">
+    <button type="submit">Entrar</button>
+    <div class="lg-erro" id="lgErro" hidden>Usuário ou senha incorretos.</div>
+  </form>
+</div>
+<div id="app" hidden>
+  <aside class="sidebar">
+    <div class="marca">Análise das Eleições<small id="marca-sub">Nova Lima / MG</small></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="rodape" id="rodape"></div>
+  </aside>
+  <main id="view"></main>
+</div>
+
+<script src="chart.umd.min.js"></script>
+<script src="dados.js"></script>
+<script>
+(function(){
+  "use strict";
+  var D = window.DADOS;
+  if(!D){ document.getElementById('view').innerHTML =
+    '<p style="padding:20px">Não encontrei <b>dados.js</b>. Rode <code>_gerador/gerar_dados.py</code> e mantenha os arquivos na mesma pasta.</p>'; return; }
+
+  var fmt = new Intl.NumberFormat('pt-BR');
+  var MACROS = D.macros_ordem;
+  var m2M = D.micro_para_macro;
+  var CORES = {azul:'#2f5597', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
+
+  var st = { rota:'menu', pageId:null, selCand:null, selMacro:null, selMicro:null, selPart:null, selStatus:null, busca:'', tudo:false, navAbertos:null };
+  var buscaTimer=null;
+  function limpaCharts(){
+    try{ Object.values(Chart.instances||{}).forEach(function(c){ try{c.destroy();}catch(e){} }); }catch(e){}
+  }
+
+  document.getElementById('marca-sub').textContent = D.municipio || 'Nova Lima / MG';
+  document.getElementById('rodape').innerHTML =
+    'Fonte: '+ (D.fonte||'TRE-MG') +'<br>Dados de: '+ (D.gerado_em||'') +
+    '<br><a id="btSair" style="cursor:pointer;text-decoration:underline">Sair</a>';
+  var _sair = document.getElementById('btSair');
+  if(_sair) _sair.onclick = function(){ try{ localStorage.removeItem('pnl_auth'); }catch(e){} location.reload(); };
+
+  function pg(id){ for(var i=0;i<D.paginas.length;i++) if(D.paginas[i].id===id) return D.paginas[i]; return null; }
+  function limparFiltros(){ st.selCand=null; st.selMacro=null; st.selMicro=null; st.selPart=null; st.selStatus=null; st.busca=''; st.tudo=false; }
+
+  /* ---------------- navegação lateral (accordion por ano) ---------------- */
+  function anoDaPagina(p){
+    var m = String(p.id).match(/(20\d\d)/);
+    if(m) return m[1];
+    return (String(p.id).indexOf('vereador')>=0) ? '2024' : '—';
+  }
+  function grupoDaPagina(id){
+    for(var i=0;i<D.paginas.length;i++) if(D.paginas[i].id===id) return 'Eleições '+anoDaPagina(D.paginas[i]);
+    return null;
+  }
+  function montaNav(){
+    var nav = document.getElementById('nav');
+    var grupos = {}, ordem = [];
+    D.paginas.forEach(function(p){
+      var label = 'Eleições ' + anoDaPagina(p);
+      if(!grupos[label]){ grupos[label] = []; ordem.push(label); }
+      grupos[label].push(p);
+    });
+    ordem.sort(function(a,b){ return b.localeCompare(a); });   // 2024, 2022, 2020…
+
+    if(!st.navAbertos){
+      st.navAbertos = {};
+      var alvo = (st.rota==='pagina' && grupoDaPagina(st.pageId)) || ordem[0];
+      st.navAbertos[alvo] = true;
+    }
+
+    var h = '<a data-rota="menu" class="'+(st.rota==='menu'?'ativo':'')+'">☰ Menu principal</a>';
+    ordem.forEach(function(label){
+      var aberto = !!st.navAbertos[label];
+      h += '<div class="nav-grp'+(aberto?' aberto':'')+'" data-grp="'+escAttr(label)+'">'+
+             '<span class="nav-grp-seta">▸</span>'+label+'</div>'+
+           '<div class="nav-sub"'+(aberto?'':' hidden')+'>';
+      grupos[label].forEach(function(p){
+        h += '<a data-page="'+p.id+'" class="'+(st.pageId===p.id&&st.rota==='pagina'?'ativo':'')+'">'+ p.titulo +'</a>';
+      });
+      h += '</div>';
+    });
+    h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>';
+    nav.innerHTML = h;
+
+    nav.querySelectorAll('.nav-grp').forEach(function(g){
+      g.onclick = function(){
+        var L = g.dataset.grp;
+        st.navAbertos[L] = !st.navAbertos[L];
+        montaNav();
+      };
+    });
+    nav.querySelectorAll('a').forEach(function(a){
+      a.onclick = function(){
+        if(a.dataset.page){
+          st.rota='pagina'; st.pageId=a.dataset.page; limparFiltros();
+          var g = grupoDaPagina(a.dataset.page); if(g) st.navAbertos[g] = true;
+        } else { st.rota=a.dataset.rota; }
+        render();
+      };
+    });
+  }
+
+  /* ---------------- cálculos com filtro cruzado ---------------- */
+  var _metaCache = {};
+  function metaCand(p){
+    if(_metaCache._id===p.id) return _metaCache.mp;
+    var mp={}; p.candidatos.forEach(function(c){ mp[c.nome]={status:c.status,partido:c.partido}; });
+    _metaCache = {_id:p.id, mp:mp};
+    return mp;
+  }
+  var ORDEM_STATUS = ['Eleito','Suplente','Legenda','Branco','Nulo'];
+  function statusDaPagina(p){
+    var s={}; p.candidatos.forEach(function(c){ if(c.status) s[c.status]=1; });
+    var lista = ORDEM_STATUS.filter(function(x){ return s[x]; });
+    Object.keys(s).forEach(function(x){ if(lista.indexOf(x)<0) lista.push(x); });
+    return lista;
+  }
+  function partidosDaPagina(p){
+    var s={}; p.candidatos.forEach(function(c){ if(c.partido) s[c.partido]=1; });
+    return Object.keys(s).sort();
+  }
+  function mostraFiltrosVereador(p){ return statusDaPagina(p).length>=3; }
+
+  // um candidato passa pelos filtros de status/partido?
+  function passaSP(meta, nome){
+    var mt = meta[nome] || {};
+    if(st.selStatus && mt.status!==st.selStatus) return false;
+    if(st.selPart   && mt.partido!==st.selPart) return false;
+    return true;
+  }
+  // a micro-regiao esta dentro da area geografica filtrada? (bairro OU macro-regiao)
+  function noArea(micro){
+    if(st.selMicro) return micro===st.selMicro;
+    if(st.selMacro) return m2M[micro]===st.selMacro;
+    return true;
+  }
+  var temAreaFiltro = function(){ return !!(st.selMicro || st.selMacro); };
+
+  function candFiltrados(p){
+    var meta = metaCand(p), lista;
+    if(temAreaFiltro()){
+      var acc={};
+      p.cruzamento.forEach(function(r){
+        if(!noArea(r.m)) return;
+        if(!passaSP(meta, r.c)) return;
+        acc[r.c]=(acc[r.c]||0)+r.v;
+      });
+      lista = Object.keys(acc).map(function(n){
+        return {nome:n, votos:acc[n], status:meta[n]&&meta[n].status, partido:meta[n]&&meta[n].partido}; });
+    } else {
+      lista = p.candidatos.filter(function(c){ return passaSP(meta, c.nome); })
+        .map(function(c){ return {nome:c.nome, votos:c.votos, status:c.status, partido:c.partido}; });
+    }
+    lista.sort(function(a,b){ return b.votos-a.votos; });
+    if(st.busca){
+      var q = st.busca.toLowerCase();
+      lista = lista.filter(function(c){ return c.nome.toLowerCase().indexOf(q)>=0
+        || (c.partido&&c.partido.toLowerCase().indexOf(q)>=0); });
+    }
+    return lista;
+  }
+  // grafico de macro-regiao: sempre mostra as 9, filtrando por candidato/status/partido (nao pela area)
+  function macroTotais(p){
+    var meta = metaCand(p), t={}; MACROS.forEach(function(m){ t[m]=0; });
+    p.cruzamento.forEach(function(r){
+      if(st.selCand && r.c!==st.selCand) return;
+      if(!passaSP(meta, r.c)) return;
+      if(t[m2M[r.m]]!==undefined) t[m2M[r.m]]+=r.v;
+    });
+    return MACROS.map(function(m){ return {regiao:m, votos:t[m]}; });
+  }
+  // tabela de micro-regiao: sempre mostra todas, filtrando por candidato/status/partido (nao pela area)
+  function microTotais(p){
+    var meta = metaCand(p), t={};
+    p.cruzamento.forEach(function(r){
+      if(st.selCand && r.c!==st.selCand) return;
+      if(!passaSP(meta, r.c)) return;
+      t[r.m]=(t[r.m]||0)+r.v;
+    });
+    return Object.keys(t).map(function(k){ return {micro:k, votos:t[k]}; })
+      .sort(function(a,b){ return b.votos-a.votos; });
+  }
+  // total de votos na area geografica selecionada (respeitando candidato/status/partido)
+  function totalArea(p){
+    var meta = metaCand(p), s=0;
+    p.cruzamento.forEach(function(r){
+      if(!noArea(r.m)) return;
+      if(st.selCand && r.c!==st.selCand) return;
+      if(!passaSP(meta, r.c)) return;
+      s+=r.v;
+    });
+    return s;
+  }
+  function partidoTotais(p){
+    var t={};
+    p.candidatos.forEach(function(c){
+      if(!c.partido) return;
+      if(st.selStatus && c.status!==st.selStatus) return;
+      t[c.partido]=(t[c.partido]||0)+c.votos;
+    });
+    return Object.keys(t).map(function(k){ return {partido:k, votos:t[k]}; })
+      .sort(function(a,b){ return b.votos-a.votos; });
+  }
+  function votosSelecao(p){
+    if(temAreaFiltro()) return totalArea(p);
+    if(st.selCand){
+      var c = p.candidatos.find(function(x){ return x.nome===st.selCand; });
+      return c? c.votos : 0;
+    }
+    return microTotais(p).reduce(function(a,x){ return a+x.votos; },0);
+  }
+
+  /* ---------------- render ---------------- */
+  function render(){
+    limpaCharts();
+    montaNav();
+    var v = document.getElementById('view');
+    if(st.rota==='regioes') return renderRegioes(v);
+    if(st.rota==='pagina') return renderPagina(v, pg(st.pageId));
+    return renderMenu(v);
+  }
+
+  function renderMenu(v){
+    v.innerHTML =
+      '<div class="capa">'+
+        '<div class="icone">🗳️</div>'+
+        '<h1>Análise das eleições do<br>município de Nova Lima</h1>'+
+        '<p class="anos"><b>Anos: 2020, 2022 e 2024</b></p>'+
+        '<p>Elaborado por: Jucilei Nunes Ferreira</p>'+
+        '<p>Contato: 31-99615-0881</p>'+
+        '<p>Fonte: TRE-MG</p>'+
+        '<p class="dica-menu">Escolha um cargo ou eleição no menu à esquerda.</p>'+
+      '</div>';
+  }
+
+  function barraFiltrosVereador(p){
+    var sts = statusDaPagina(p);
+    var parts = partidosDaPagina(p);
+    var h = '<div class="filtros-ver">';
+    h += '<div class="fgrp"><span class="flab">Status</span>';
+    sts.forEach(function(s){
+      h += '<button class="fchip'+(st.selStatus===s?' on':'')+'" data-fst="'+escAttr(s)+'">'+s+'</button>';
+    });
+    h += '</div>';
+    if(parts.length){
+      h += '<div class="fgrp"><span class="flab">Partido</span><select id="selPartido"><option value="">Todos os partidos</option>';
+      parts.forEach(function(pt){ h += '<option value="'+escAttr(pt)+'"'+(st.selPart===pt?' selected':'')+'>'+pt+'</option>'; });
+      h += '</select></div>';
+    }
+    h += '<button class="fchip lisa" id="fvLimpar">limpar estes filtros</button>';
+    h += '</div>';
+    return h;
+  }
+
+  function kpisAtuais(p){
+    var base = p.kpis || {};
+    if(!p.kpis_micro || !temAreaFiltro()) return base;
+    var a=0,c=0,ab=0,n=0;
+    for(var mi in p.kpis_micro){
+      if(!noArea(mi)) continue;
+      var x=p.kpis_micro[mi]; a+=x.a; c+=x.c; ab+=x.ab; n+=x.n;
+    }
+    return {aptos:a, comparecimento:c, abstencoes:ab, nominais:n};
+  }
+  // conta votos de Branco / Nulo (respeita a área geográfica e o status selecionados)
+  function contaEspecial(p, alvos){
+    if(st.selStatus && alvos.indexOf(st.selStatus.toLowerCase())<0) return 0;
+    if(temAreaFiltro()){
+      var s=0;
+      p.cruzamento.forEach(function(r){
+        if(!noArea(r.m)) return;
+        if(alvos.indexOf((r.c||'').toLowerCase())>=0) s+=r.v;
+      });
+      return s;
+    }
+    var t=0;
+    p.candidatos.forEach(function(c){ if(alvos.indexOf((c.nome||'').toLowerCase())>=0) t+=c.votos; });
+    return t;
+  }
+
+  function renderPagina(v, p){
+    if(!p){ v.innerHTML='<p>Página não encontrada.</p>'; return; }
+    limpaCharts();
+    var k = kpisAtuais(p);
+    var perc = k.aptos ? (100*k.comparecimento/k.aptos) : 0;
+    var brancos = contaEspecial(p, ['branco','voto branco']);
+    var nulos   = contaEspecial(p, ['nulo','voto nulo']);
+    var ehPartido = p.vista === 'partido';
+    var temFV = mostraFiltrosVereador(p);
+    var area = st.selMicro ? ('Bairro: '+st.selMicro) : (st.selMacro ? ('Região: '+st.selMacro) : '');
+    var rotArea = st.selMicro ? ' (bairro)' : (st.selMacro ? ' (região)' : '');
+    var escP = [];
+    if(area)         escP.push(area);
+    if(st.selStatus) escP.push('Status: '+st.selStatus);
+    if(st.selPart)   escP.push('Partido: '+st.selPart);
+    if(st.selCand)   escP.push('Candidato: '+st.selCand);
+    var escopo = escP.length ? escP.join(' &nbsp;·&nbsp; ') : 'Município inteiro';
+
+    v.innerHTML =
+      '<div class="topo">'+
+        '<div><h1>'+p.titulo+'</h1><div class="sub">'+(D.municipio||'Nova Lima / MG')+
+          ' · Fonte TRE-MG'+(p.tem_partido?' · '+p.candidatos.length+' candidatos':'')+
+          ' &nbsp;•&nbsp; <b>'+escopo+'</b></div></div>'+
+        '<button class="btn btn-cinza" id="btLimpar">Limpar filtros</button>'+
+      '</div>'+
+      (temFV ? barraFiltrosVereador(p) : '')+
+      '<div class="kpis">'+
+        kpi('Aptos'+rotArea, k.aptos)+
+        kpi('Comparecimento'+rotArea, k.comparecimento)+
+        kpi('Abstenções'+rotArea, k.abstencoes)+
+        kpi('Votos nominais'+rotArea, k.nominais)+
+        kpi('Brancos'+rotArea, brancos)+
+        kpi('Nulos'+rotArea, nulos)+
+        kpi('% Comparecimento', perc.toFixed(1).replace('.',',')+'%', true)+
+        '<div class="kpi destaque"><div class="rot">Votos na seleção</div><div class="val" id="kvSel">—</div></div>'+
+      '</div>'+
+      (temAreaFiltro()?'<div class="escopo-nota">Todos os números desta tela referentes a <b>'+
+        (st.selMicro?('bairro '+st.selMicro):('região '+st.selMacro))+'</b>'+
+        (st.selCand?(' · candidato <b>'+st.selCand+'</b>'):'')+
+        '. Clique de novo no item selecionado ou em “Limpar filtros” para voltar.</div>':'')+
+      '<div class="grade">'+
+        '<div class="painel" id="pnEsq"></div>'+
+        '<div class="painel" id="pnMeio"></div>'+
+        '<div class="painel" id="pnDir"></div>'+
+      '</div>'+
+      (ehPartido ? '<div class="painel painel-full" id="pnPart"></div>' : '');
+
+    document.getElementById('btLimpar').onclick = function(){ limparFiltros(); render(); };
+
+    if(temFV){
+      v.querySelectorAll('.filtros-ver [data-fst]').forEach(function(bt){
+        bt.onclick = function(){
+          var val = bt.dataset.fst;
+          st.selStatus = (st.selStatus===val) ? null : val;
+          st.selCand = null; render();
+        };
+      });
+      var selP = document.getElementById('selPartido');
+      if(selP) selP.onchange = function(){ st.selPart = this.value || null; st.selCand=null; render(); };
+      var fvl = document.getElementById('fvLimpar');
+      if(fvl) fvl.onclick = function(){ st.selStatus=null; st.selPart=null; render(); };
+    }
+
+    /* ----- painel esquerdo: candidatos (ou partidos) ----- */
+    var pnEsq = document.getElementById('pnEsq');
+    if(ehPartido){
+      var parts = partidoTotais(p);
+      var totParts = parts.reduce(function(a,x){return a+x.votos;},0);
+      pnEsq.innerHTML = '<h3>Votos por partido <span class="tot">total '+fmt.format(totParts)+'</span></h3>'+
+        '<div class="dica">Clique numa barra para filtrar os candidatos e as regiões.</div>'+
+        (st.selPart?'<span class="filtro-ativo" id="fPart">Partido: '+st.selPart+' ✕</span>':'')+
+        '<div class="scrollbox"><div class="chart-wrap" style="height:'+alturaGrafico(parts.length)+'px"><canvas id="cChart"></canvas></div></div>';
+      desenhaBarras('cChart', parts.map(function(x){return x.partido;}), parts.map(function(x){return x.votos;}),
+        parts.map(function(x){ return x.partido===st.selPart?CORES.verde:CORES.azul; }),
+        function(i){ st.selPart = (st.selPart===parts[i].partido)?null:parts[i].partido; st.selCand=null; render(); });
+      if(st.selPart) document.getElementById('fPart').onclick=function(){ st.selPart=null; render(); };
+    } else {
+      var cands = candFiltrados(p);
+      var totCand = cands.reduce(function(a,x){return a+x.votos;},0);
+      var limite = st.tudo ? cands.length : Math.min(cands.length, 22);
+      var vis = cands.slice(0, limite);
+      pnEsq.innerHTML = '<h3>Ranking de candidatos'+(st.selMicro?' — '+st.selMicro:(st.selMacro?' — '+st.selMacro:''))+
+          ' <span class="tot">total '+fmt.format(totCand)+'</span></h3>'+
+        '<div class="dica">Clique numa barra para ver onde o candidato teve votos.</div>'+
+        (st.selCand?'<span class="filtro-ativo" id="fCand">Candidato: '+st.selCand+' ✕</span>':'')+
+        '<input class="barra-busca" id="busca" placeholder="Buscar candidato ou partido…" value="'+escAttr(st.busca)+'">'+
+        (cands.length>22 ? '<div style="margin:2px 0 8px"><a style="cursor:pointer;color:#2f5597;font-weight:600" id="verTudo">'+
+            (st.tudo?'▲ Ver menos':'▼ Ver todos os '+cands.length)+'</a></div>' : '')+
+        '<div class="scrollbox"><div class="chart-wrap" style="height:'+alturaGrafico(vis.length)+'px"><canvas id="cChart"></canvas></div></div>';
+      desenhaBarras('cChart',
+        vis.map(function(c){ return c.nome + (c.partido?'  ('+c.partido+')':''); }),
+        vis.map(function(c){ return c.votos; }),
+        vis.map(function(c){ return c.nome===st.selCand?CORES.verde
+              : c.status==='Eleito'?CORES.verde
+              : (c.status==='Suplente'||c.status==='Legenda')?CORES.cinza
+              : CORES.azul; }),
+        function(i){ st.selCand = (st.selCand===vis[i].nome)?null:vis[i].nome; st.selPart=null; render(); });
+      var b = document.getElementById('busca');
+      b.oninput = function(){
+        st.busca=b.value; var pos=b.selectionStart;
+        clearTimeout(buscaTimer);
+        buscaTimer = setTimeout(function(){
+          renderPagina(v,p);
+          var nb=document.getElementById('busca'); if(nb){ nb.focus(); nb.selectionStart=nb.selectionEnd=pos; }
+        }, 160);
+      };
+      if(st.selCand) document.getElementById('fCand').onclick=function(){ st.selCand=null; render(); };
+      var vt=document.getElementById('verTudo'); if(vt) vt.onclick=function(){ st.tudo=!st.tudo; render(); };
+    }
+
+    /* ----- painel do meio: regiões (macro) ----- */
+    var macros = macroTotais(p);
+    var totMac = macros.reduce(function(a,x){return a+x.votos;},0);
+    var alvoMac = st.selMacro || (st.selMicro ? m2M[st.selMicro] : null);
+    document.getElementById('pnMeio').innerHTML =
+      '<h3>Votos por região'+(st.selCand?' — '+st.selCand:(st.selPart?' — '+st.selPart:''))+
+        ' <span class="tot">total '+fmt.format(totMac)+'</span></h3>'+
+      '<div class="dica">Clique numa barra para ver os números daquela região.</div>'+
+      (st.selMacro?'<span class="filtro-ativo" id="fMac">Região: '+st.selMacro+' ✕</span>':'')+
+      '<div class="chart-wrap" style="height:'+alturaGrafico(macros.length)+'px"><canvas id="mChart"></canvas></div>';
+    desenhaBarras('mChart', macros.map(function(x){return x.regiao;}), macros.map(function(x){return x.votos;}),
+      macros.map(function(x){ return x.regiao===alvoMac?CORES.verde:CORES.azul; }),
+      function(i){ var r=macros[i].regiao; st.selMacro=(st.selMacro===r)?null:r; st.selMicro=null; render(); });
+    if(st.selMacro) document.getElementById('fMac').onclick=function(){ st.selMacro=null; render(); };
+
+    /* ----- painel direito: micro-regiões (tabela) ----- */
+    var micros = microTotais(p);
+    var totMi = micros.reduce(function(a,x){return a+x.votos;},0);
+    var linhas = micros.map(function(x){
+      var sel = (x.micro===st.selMicro);
+      return '<tr class="clic'+(sel?' sel':'')+'" data-micro="'+escAttr(x.micro)+'">'+
+        '<td>'+x.micro+'<span class="mrx">'+(m2M[x.micro]||'')+'</span></td>'+
+        '<td class="num">'+fmt.format(x.votos)+'</td></tr>';
+    }).join('');
+    document.getElementById('pnDir').innerHTML =
+      '<h3>Votos por micro-região (bairro) <span class="tot">total '+fmt.format(totMi)+'</span></h3>'+
+      '<div class="dica">Clique num bairro para ver os números só dele.</div>'+
+      (st.selMicro?'<span class="filtro-ativo" id="fMic">Bairro: '+st.selMicro+' ✕</span>':'')+
+      '<div class="scrollbox"><table class="tab"><thead><tr><th>Micro-região</th><th class="num">Votos</th></tr></thead>'+
+      '<tbody>'+linhas+'</tbody>'+
+      '<tfoot><tr><td>Total</td><td class="num">'+fmt.format(totMi)+'</td></tr></tfoot></table></div>';
+    document.querySelectorAll('#pnDir tr.clic').forEach(function(tr){
+      tr.onclick=function(){ var mi=tr.dataset.micro; st.selMicro=(st.selMicro===mi)?null:mi; st.selMacro=null; render(); };
+    });
+    if(st.selMicro) document.getElementById('fMic').onclick=function(){ st.selMicro=null; render(); };
+
+    /* ----- painel inferior (só na página de partido): vereadores + legenda ----- */
+    if(ehPartido){
+      var pnPart = document.getElementById('pnPart');
+      if(!st.selPart){
+        pnPart.innerHTML = '<h3>Vereadores e legenda por partido</h3>'+
+          '<div class="dica">Clique num partido no gráfico acima para ver os vereadores dele, '+
+          'a votação de <b>legenda</b> e quem foi eleito'+
+          (temAreaFiltro()?' — considerando '+(st.selMicro?'o bairro '+st.selMicro:'a região '+st.selMacro):'')+'.</div>';
+      } else {
+        var det = detalhePartido(p, st.selPart);
+        var escArea = temAreaFiltro() ? ' <span class="tot">'+(st.selMicro?st.selMicro:st.selMacro)+'</span>' : '';
+        var linhasV = det.vereadores.map(function(x){
+          return '<tr><td>'+x.nome+'</td>'+
+            '<td><span class="badge b-'+(x.status||'')+'">'+(x.status||'—')+'</span></td>'+
+            '<td class="num">'+fmt.format(x.votos)+'</td></tr>';
+        }).join('') || '<tr><td colspan="3" style="color:var(--suave)">Sem votos nominais nesta seleção.</td></tr>';
+        pnPart.innerHTML =
+          '<h3>'+st.selPart+' — vereadores e legenda'+escArea+
+            ' <span class="tot">total '+fmt.format(det.total)+'</span></h3>'+
+          '<div class="pdet-cards">'+
+            '<div class="pdet-card"><div class="rot">Votos de legenda</div><div class="val">'+fmt.format(det.legenda)+'</div></div>'+
+            '<div class="pdet-card"><div class="rot">Votos nominais (vereadores)</div><div class="val">'+fmt.format(det.totalVereadores)+'</div></div>'+
+            '<div class="pdet-card"><div class="rot">Vereadores eleitos</div><div class="val">'+det.eleitos+'</div></div>'+
+            '<div class="pdet-card"><div class="rot">Candidatos do partido</div><div class="val">'+det.vereadores.length+'</div></div>'+
+          '</div>'+
+          '<div class="scrollbox" style="max-height:360px"><table class="tab"><thead><tr>'+
+            '<th>Vereador</th><th>Situação</th><th class="num">Votos</th></tr></thead>'+
+            '<tbody>'+linhasV+'</tbody></table></div>';
+      }
+    }
+
+    document.getElementById('kvSel').textContent = fmt.format(votosSelecao(p));
+  }
+
+  function detalhePartido(p, part){
+    var meta = metaCand(p), votosPorNome = {};
+    if(temAreaFiltro()){
+      p.cruzamento.forEach(function(r){
+        if(!noArea(r.m)) return;
+        var mt = meta[r.c]; if(!mt || mt.partido!==part) return;
+        votosPorNome[r.c] = (votosPorNome[r.c]||0) + r.v;
+      });
+    } else {
+      p.candidatos.forEach(function(c){ if(c.partido===part) votosPorNome[c.nome] = c.votos; });
+    }
+    var legenda=0, veread=[], eleitos=0;
+    Object.keys(votosPorNome).forEach(function(n){
+      var mt = meta[n]||{};
+      if(mt.status==='Legenda'){ legenda += votosPorNome[n]; return; }
+      veread.push({nome:n, votos:votosPorNome[n], status:mt.status});
+      if(mt.status==='Eleito') eleitos++;
+    });
+    veread.sort(function(a,b){ return b.votos-a.votos; });
+    var totV = veread.reduce(function(a,x){ return a+x.votos; },0);
+    return {legenda:legenda, vereadores:veread, totalVereadores:totV, total:legenda+totV, eleitos:eleitos};
+  }
+
+  function kpi(rot,val,jaTexto){
+    return '<div class="kpi"><div class="rot">'+rot+'</div><div class="val">'+
+      (jaTexto?val:(val==null?'—':fmt.format(val)))+'</div></div>';
+  }
+
+  // plugin: escreve o valor (nº de votos) em cada barra
+  var rotuloValor = {
+    id:'rotuloValor',
+    afterDatasetsDraw:function(chart){
+      var ctx = chart.ctx, ds = chart.data.datasets[0];
+      var meta = chart.getDatasetMeta(0);
+      ctx.save();
+      ctx.font = '600 11px "Segoe UI",system-ui,sans-serif';
+      ctx.textBaseline = 'middle';
+      meta.data.forEach(function(bar,i){
+        var val = ds.data[i];
+        if(val==null) return;
+        var txt = fmt.format(val);
+        var w = ctx.measureText(txt).width;
+        var fora = bar.x + 6 + w <= chart.chartArea.right;
+        if(fora){ ctx.textAlign='left'; ctx.fillStyle='#33404f'; ctx.fillText(txt, bar.x + 6, bar.y); }
+        else if(bar.x - bar.base > w + 10){ ctx.textAlign='right'; ctx.fillStyle='#fff'; ctx.fillText(txt, bar.x - 6, bar.y); }
+        else { ctx.textAlign='right'; ctx.fillStyle='#33404f'; ctx.fillText(txt, chart.chartArea.right, bar.y); }
+      });
+      ctx.restore();
+    }
+  };
+
+  function alturaGrafico(n){ return Math.max(140, n*23 + 26); }
+
+  function desenhaBarras(canvasId, labels, valores, cores, onClick){
+    var el = document.getElementById(canvasId);
+    if(!el) return;
+    var chart = new Chart(el.getContext('2d'), {
+      type:'bar',
+      data:{ labels:labels, datasets:[{ data:valores, backgroundColor:cores, borderRadius:3,
+        maxBarThickness:22, barPercentage:0.82, categoryPercentage:0.86 }] },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        layout:{ padding:{ right:58, left:2, top:2, bottom:2 } },
+        animation:{ duration:250 },
+        plugins:{ legend:{display:false},
+          tooltip:{ callbacks:{ label:function(c){ return fmt.format(c.raw)+' votos'; } } } },
+        scales:{
+          x:{ ticks:{ callback:function(v){ return fmt.format(v); }, font:{size:10} }, grid:{color:'#eef1f5'} },
+          y:{ ticks:{ font:{size:11}, autoSkip:false }, grid:{display:false} }
+        },
+        onClick:function(evt,els){ if(els&&els.length&&onClick) onClick(els[0].index); }
+      },
+      plugins:[rotuloValor]
+    });
+    return chart;
+  }
+
+  function renderRegioes(v){
+    var ref = D.regioes_ref||[];
+    var h = '<div class="topo"><div><h1>Definição das Regiões de Nova Lima</h1>'+
+            '<div class="sub">'+MACROS.length+' regiões · '+Object.keys(m2M).length+' micro-regiões</div></div></div>'+
+            '<div class="reg-grade">';
+    ref.forEach(function(g){
+      h += '<div class="reg-card"><h3>'+g.macro+'</h3><ul>';
+      g.micros.forEach(function(mi){
+        h += '<li><b>'+mi.micro+'</b> <span class="mr">— '+mi.secoes+' seç'+(mi.secoes===1?'ão':'ões')+'</span>';
+        if(mi.locais&&mi.locais.length) h += '<div class="mr">'+mi.locais.join(' · ')+'</div>';
+        h += '</li>';
+      });
+      h += '</ul></div>';
+    });
+    h += '</div>';
+    v.innerHTML = h;
+  }
+
+  function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
+
+  /* ---------------- controle de acesso (senha) ---------------- */
+  // Cadeado simples do lado do navegador. Para trocar as credenciais:
+  // gere o hash de cada texto com a função _h() abaixo e substitua os valores.
+  function _h(s){ var x=5381; for(var i=0;i<s.length;i++) x=((x<<5)+x+s.charCodeAt(i))>>>0; return x.toString(16); }
+  var ACESSO = { user:'fb833d6a', pass:'fb833d6a' };   // usuário: jucilei  /  senha: jucilei
+
+  function entrar(){
+    document.getElementById('login').hidden = true;
+    document.getElementById('app').hidden = false;
+    render();
+  }
+  var jaEntrou = false;
+  try{ jaEntrou = (localStorage.getItem('pnl_auth') === '1'); }catch(e){}
+  if(jaEntrou){
+    entrar();
+  } else {
+    document.getElementById('loginForm').addEventListener('submit', function(ev){
+      ev.preventDefault();
+      var u = (document.getElementById('lgUser').value || '').trim().toLowerCase();
+      var p = (document.getElementById('lgPass').value || '');
+      if(_h(u) === ACESSO.user && _h(p) === ACESSO.pass){
+        try{ localStorage.setItem('pnl_auth','1'); }catch(e){}
+        entrar();
+      } else {
+        document.getElementById('lgErro').hidden = false;
+      }
+    });
+    document.getElementById('lgUser').focus();
+  }
+})();
+</script>
+</body>
+</html>

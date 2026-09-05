@@ -1,0 +1,4 @@
+# arquivos de trabalho, nao versionar
+site/*.b64.txt
+*.zip
+~$*

@@ -1,0 +1,53 @@
+========================================================
+  PAINEL DE ELEICOES - NOVA LIMA
+  Repositorio Git -> publicado em https://eleicoes.gavix.tech
+========================================================
+
+Estrutura:
+  site/            -> o que fica no ar (index.html, dados.js, chart.umd.min.js)
+  _gerador/        -> gerar_dados.py  (recria site/dados.js a partir da planilha)
+  planilhas/       -> Arquivo das eleicoes.xlsx  (fonte dos dados, do TRE-MG)
+
+Login do painel:  usuario jucilei / senha jucilei
+(dentro de site/index.html, variavel ACESSO. Trocar: rodar _h("nova") no console
+ do navegador, F12, e colar o hash.)
+
+
+------------------------------------------------
+ATUALIZAR OS DADOS (nova eleicao) - fluxo igual ao segov
+------------------------------------------------
+No SEU PC (PowerShell), na pasta desta pasta:
+
+  1. Substitua planilhas\Arquivo das eleicoes.xlsx pela nova (mesmas abas/colunas)
+
+  2. cd _gerador ; python gerar_dados.py
+     (precisa: python -m pip install pandas openpyxl)
+     -> isso reescreve site\dados.js
+
+  3. cd ..
+     git add -A
+     git commit -m "dados <ano>"
+     git push
+
+Na VPS:
+
+  4. cd /srv/painel-eleicoes ; git pull
+
+Pronto. O link https://eleicoes.gavix.tech e o login continuam iguais.
+Nao precisa mexer no Caddy.
+
+
+------------------------------------------------
+MEXER NO PAINEL (layout, graficos, menu)
+------------------------------------------------
+Editar  site\index.html  direto -> git add/commit/push -> git pull na VPS.
+
+
+------------------------------------------------
+INFRA
+------------------------------------------------
+  Dominio/DNS : Cloudflare (registro A eleicoes -> 179.197.233.19, DNS only)
+  Servidor    : VPS Hostinger, Caddy do host (/etc/caddy/Caddyfile)
+                bloco  eleicoes.gavix.tech { root * /srv/painel-eleicoes/site ; file_server ... }
+  HTTPS       : Let's Encrypt automatico pelo Caddy
+  Fonte       : TRE-MG  -  Elaborado por Jucilei Nunes Ferreira (31-99615-0881)
