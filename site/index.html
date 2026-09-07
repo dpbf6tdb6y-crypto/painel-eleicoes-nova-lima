@@ -197,7 +197,7 @@
   var m2M = D.micro_para_macro;
   var CORES = {azul:'#2f5597', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
 
-  var st = { rota:'menu', pageId:null, selCand:null, selMacro:null, selMicro:null, selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
+  var st = { rota:'menu', pageId:null, selCand:null, selMacros:[], selMicros:[], selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
   var acessosEdit = null;   // cópia de trabalho da lista de usuários (tela Acessos)
   var buscaTimer=null;
   function limpaCharts(){
@@ -208,8 +208,8 @@
   // o rodapé (com "Conectado: <nome>" e "Sair") é montado em entrar()
 
   function pg(id){ for(var i=0;i<D.paginas.length;i++) if(D.paginas[i].id===id) return D.paginas[i]; return null; }
-  function limparFiltros(){ st.selCand=null; st.selMacro=null; st.selMicro=null; st.selPart=null; st.selStatus=null; st.metrica='votos'; st.busca=''; st.tudo=false; }
-  function temAlgumFiltro(){ return !!(st.selCand||st.selMacro||st.selMicro||st.selPart||st.selStatus||st.busca||st.tudo||st.metrica!=='votos'); }
+  function limparFiltros(){ st.selCand=null; st.selMacros=[]; st.selMicros=[]; st.selPart=null; st.selStatus=null; st.metrica='votos'; st.busca=''; st.tudo=false; }
+  function temAlgumFiltro(){ return !!(st.selCand||st.selMacros.length||st.selMicros.length||st.selPart||st.selStatus||st.busca||st.tudo||st.metrica!=='votos'); }
 
   /* ---------------- navegação lateral (accordion por ano) ---------------- */
   function anoDaPagina(p){
@@ -300,13 +300,37 @@
     if(st.selPart   && mt.partido!==st.selPart) return false;
     return true;
   }
-  // a micro-regiao esta dentro da area geografica filtrada? (bairro OU macro-regiao)
+  // seleção geográfica é MÚLTIPLA: st.selMacros[] OU st.selMicros[] (grupos exclusivos)
+  function macroSel(m){ return st.selMacros.indexOf(m) >= 0; }
+  function microSel(m){ return st.selMicros.indexOf(m) >= 0; }
+  function toggleSel(arr, v){ var i = arr.indexOf(v); if(i<0) arr.push(v); else arr.splice(i,1); }
   function noArea(micro){
-    if(st.selMicro) return micro===st.selMicro;
-    if(st.selMacro) return m2M[micro]===st.selMacro;
+    if(st.selMicros.length) return microSel(micro);
+    if(st.selMacros.length) return macroSel(m2M[micro]);
     return true;
   }
-  var temAreaFiltro = function(){ return !!(st.selMicro || st.selMacro); };
+  function temAreaFiltro(){ return !!(st.selMicros.length || st.selMacros.length); }
+  // p/ a TABELA de bairros: filtra por macro selecionada, mas NÃO colapsa quando a seleção
+  // é por bairro (assim dá pra clicar em vários bairros seguidos)
+  function noAreaTabela(micro){
+    if(st.selMacros.length) return macroSel(m2M[micro]);
+    return true;
+  }
+  function areaLista(){
+    if(st.selMicros.length) return { tipo:'bairro', itens: st.selMicros };
+    if(st.selMacros.length) return { tipo:'região', itens: st.selMacros };
+    return { tipo:'', itens:[] };
+  }
+  function areaTexto(){
+    var a = areaLista(); if(!a.itens.length) return '';
+    var pl = a.itens.length > 1;
+    var rot = a.tipo==='bairro' ? (pl?'Bairros':'Bairro') : (pl?'Regiões':'Região');
+    return rot + ': ' + a.itens.join(', ');
+  }
+  function areaCurta(){
+    var it = areaLista().itens; if(!it.length) return '';
+    return it.length<=2 ? it.join(' + ') : (it.slice(0,2).join(' + ') + ' +'+(it.length-2));
+  }
 
   function candFiltrados(p){
     var meta = metaCand(p), lista;
@@ -341,12 +365,12 @@
     });
     return MACROS.map(function(m){ return {regiao:m, votos:t[m]}; });
   }
-  // tabela de micro-regiao: filtra por candidato/status/partido E pela regiao/bairro selecionados
+  // tabela de micro-regiao: filtra por candidato/status/partido; por macro se houver; nunca colapsa por bairro
   function microTotais(p){
     var meta = metaCand(p), t={};
     p.cruzamento.forEach(function(r){
       if(st.selCand && r.c!==st.selCand) return;
-      if(!noArea(r.m)) return;
+      if(!noAreaTabela(r.m)) return;
       if(!passaSP(meta, r.c)) return;
       t[r.m]=(t[r.m]||0)+r.v;
     });
@@ -407,10 +431,10 @@
     if(!met.fonte) return microTotais(p);
     var t={};
     if(met.fonte==='kpi' && p.kpis_micro){
-      for(var mi in p.kpis_micro){ if(noArea(mi)) t[mi]=(p.kpis_micro[mi][met.k]||0); }
+      for(var mi in p.kpis_micro){ if(noAreaTabela(mi)) t[mi]=(p.kpis_micro[mi][met.k]||0); }
     } else {
       p.cruzamento.forEach(function(r){
-        if(!noArea(r.m)) return;
+        if(!noAreaTabela(r.m)) return;
         if(met.alvos.indexOf((r.c||'').toLowerCase())<0) return;
         t[r.m]=(t[r.m]||0)+r.v;
       });
@@ -505,8 +529,9 @@
     var nulos   = contaEspecial(p, ['nulo','voto nulo']);
     var ehPartido = p.vista === 'partido';
     var temFV = mostraFiltrosVereador(p);
-    var area = st.selMicro ? ('Bairro: '+st.selMicro) : (st.selMacro ? ('Região: '+st.selMacro) : '');
-    var rotArea = st.selMicro ? ' (bairro)' : (st.selMacro ? ' (região)' : '');
+    var area = areaTexto();
+    var rotArea = st.selMicros.length ? (st.selMicros.length>1?' (bairros)':' (bairro)')
+                : st.selMacros.length ? (st.selMacros.length>1?' (regiões)':' (região)') : '';
     var escP = [];
     if(area)         escP.push(area);
     if(st.selStatus) escP.push('Status: '+st.selStatus);
@@ -534,10 +559,9 @@
         kpi('% Comparecimento', perc.toFixed(1).replace('.',',')+'%', true)+
         '<div class="kpi destaque"><div class="rot">Votos na seleção</div><div class="val" id="kvSel">—</div></div>'+
       '</div>'+
-      (temAreaFiltro()?'<div class="escopo-nota">Todos os números desta tela referentes a <b>'+
-        (st.selMicro?('bairro '+st.selMicro):('região '+st.selMacro))+'</b>'+
+      (temAreaFiltro()?'<div class="escopo-nota">Somando <b>'+ areaTexto() +'</b>'+
         (st.selCand?(' · candidato <b>'+st.selCand+'</b>'):'')+
-        '. Clique de novo no item selecionado ou em “Limpar filtros” para voltar.</div>':'')+
+        '. Clique nas barras/linhas para incluir ou tirar; “Limpar seleção” zera tudo.</div>':'')+
       '<div class="grade'+(st.metrica!=='votos'?' grade-2':'')+'">'+
         (st.metrica!=='votos' ? '' : '<div class="painel" id="pnEsq"></div>')+
         '<div class="painel" id="pnMeio"></div>'+
@@ -586,7 +610,7 @@
       var totCand = cands.reduce(function(a,x){return a+x.votos;},0);
       var limite = st.tudo ? cands.length : Math.min(cands.length, 22);
       var vis = cands.slice(0, limite);
-      pnEsq.innerHTML = '<h3>Ranking de candidatos'+(st.selMicro?' — '+st.selMicro:(st.selMacro?' — '+st.selMacro:''))+
+      pnEsq.innerHTML = '<h3>Ranking de candidatos'+(areaCurta()?' — '+areaCurta():'')+
           ' <span class="tot">total '+fmt.format(totCand)+'</span></h3>'+
         '<div class="dica">Clique numa barra para ver onde o candidato teve votos.</div>'+
         (st.selCand?'<span class="filtro-ativo" id="fCand">Candidato: '+st.selCand+' ✕</span>':'')+
@@ -620,39 +644,44 @@
     var ehVotos = (st.metrica === 'votos');
     var macros = macroValores(p);
     var totMac = macros.reduce(function(a,x){return a+x.votos;},0);
-    var alvoMac = st.selMacro || (st.selMicro ? m2M[st.selMicro] : null);
+    var alvoMacs = {};
+    st.selMacros.forEach(function(m){ alvoMacs[m]=1; });
+    st.selMicros.forEach(function(mi){ alvoMacs[m2M[mi]]=1; });
     document.getElementById('pnMeio').innerHTML =
       '<h3>'+rotMet+' por região'+(ehVotos && st.selCand?' — '+st.selCand:(ehVotos && st.selPart?' — '+st.selPart:''))+
         ' <span class="tot">total '+fmt.format(totMac)+'</span></h3>'+
-      '<div class="dica">'+(ehVotos?'Clique numa barra para ver os números daquela região.'
+      '<div class="dica">'+(ehVotos?'Clique nas barras para <b>somar</b> uma ou mais regiões.'
         :'Mostrando <b>'+rotMet+'</b>. Clique de novo no cartão “'+rotMet+'” para voltar aos votos.')+'</div>'+
-      (st.selMacro?'<span class="filtro-ativo" id="fMac">Região: '+st.selMacro+' ✕</span>':'')+
+      (st.selMacros.length?'<span class="filtro-ativo" id="fMac">'+areaTexto()+' ✕</span>':'')+
       '<div class="chart-wrap" style="height:'+(ehVotos?alturaGrafico(macros.length):Math.round(alturaGrafico(macros.length)*1.5))+'px"><canvas id="mChart"></canvas></div>';
     desenhaBarras('mChart', macros.map(function(x){return x.regiao;}), macros.map(function(x){return x.votos;}),
-      macros.map(function(x){ return x.regiao===alvoMac?CORES.verde:CORES.azul; }),
-      function(i){ var r=macros[i].regiao; st.selMacro=(st.selMacro===r)?null:r; st.selMicro=null; render(); });
-    if(st.selMacro) document.getElementById('fMac').onclick=function(){ st.selMacro=null; render(); };
+      macros.map(function(x){ return alvoMacs[x.regiao]?CORES.verde:CORES.azul; }),
+      function(i){ toggleSel(st.selMacros, macros[i].regiao); st.selMicros=[]; render(); });
+    if(st.selMacros.length) document.getElementById('fMac').onclick=function(){ st.selMacros=[]; render(); };
 
     /* ----- painel direito: micro-regiões (tabela) ----- */
     var micros = microValores(p);
-    var totMi = micros.reduce(function(a,x){return a+x.votos;},0);
+    var somaTodos = micros.reduce(function(a,x){return a+x.votos;},0);
+    var somaSel = st.selMicros.length ? micros.filter(function(x){return microSel(x.micro);})
+                                              .reduce(function(a,x){return a+x.votos;},0) : 0;
+    var totMi = st.selMicros.length ? somaSel : somaTodos;
+    var rotTot = st.selMicros.length ? ('soma de '+st.selMicros.length+' bairro'+(st.selMicros.length>1?'s':'')) : 'total';
     var linhas = micros.map(function(x){
-      var sel = (x.micro===st.selMicro);
-      return '<tr class="clic'+(sel?' sel':'')+'" data-micro="'+escAttr(x.micro)+'">'+
+      return '<tr class="clic'+(microSel(x.micro)?' sel':'')+'" data-micro="'+escAttr(x.micro)+'">'+
         '<td>'+x.micro+'<span class="mrx">'+(m2M[x.micro]||'')+'</span></td>'+
         '<td class="num">'+fmt.format(x.votos)+'</td></tr>';
     }).join('');
     document.getElementById('pnDir').innerHTML =
-      '<h3>'+rotMet+' por bairro <span class="tot">total '+fmt.format(totMi)+'</span></h3>'+
-      '<div class="dica">Clique num bairro para ver os números só dele.</div>'+
-      (st.selMicro?'<span class="filtro-ativo" id="fMic">Bairro: '+st.selMicro+' ✕</span>':'')+
+      '<h3>'+rotMet+' por bairro <span class="tot">'+rotTot+' '+fmt.format(totMi)+'</span></h3>'+
+      '<div class="dica">Clique nos bairros para <b>somar</b> um ou mais.</div>'+
+      (st.selMicros.length?'<span class="filtro-ativo" id="fMic">'+areaTexto()+' ✕</span>':'')+
       '<div class="scrollbox"><table class="tab"><thead><tr><th>Micro-região</th><th class="num">'+rotMet+'</th></tr></thead>'+
       '<tbody>'+linhas+'</tbody>'+
-      '<tfoot><tr><td>Total</td><td class="num">'+fmt.format(totMi)+'</td></tr></tfoot></table></div>';
+      '<tfoot><tr><td>'+(st.selMicros.length?'Selecionados':'Total')+'</td><td class="num">'+fmt.format(totMi)+'</td></tr></tfoot></table></div>';
     document.querySelectorAll('#pnDir tr.clic').forEach(function(tr){
-      tr.onclick=function(){ var mi=tr.dataset.micro; st.selMicro=(st.selMicro===mi)?null:mi; st.selMacro=null; render(); };
+      tr.onclick=function(){ toggleSel(st.selMicros, tr.dataset.micro); st.selMacros=[]; render(); };
     });
-    if(st.selMicro) document.getElementById('fMic').onclick=function(){ st.selMicro=null; render(); };
+    if(st.selMicros.length) document.getElementById('fMic').onclick=function(){ st.selMicros=[]; render(); };
 
     /* ----- painel inferior (só na página de partido): vereadores + legenda ----- */
     if(ehPartido && document.getElementById('pnPart')){
@@ -661,10 +690,10 @@
         pnPart.innerHTML = '<h3>Vereadores e legenda por partido</h3>'+
           '<div class="dica">Clique num partido no gráfico acima para ver os vereadores dele, '+
           'a votação de <b>legenda</b> e quem foi eleito'+
-          (temAreaFiltro()?' — considerando '+(st.selMicro?'o bairro '+st.selMicro:'a região '+st.selMacro):'')+'.</div>';
+          (temAreaFiltro()?' — considerando '+areaTexto():'')+'.</div>';
       } else {
         var det = detalhePartido(p, st.selPart);
-        var escArea = temAreaFiltro() ? ' <span class="tot">'+(st.selMicro?st.selMicro:st.selMacro)+'</span>' : '';
+        var escArea = temAreaFiltro() ? ' <span class="tot">'+areaCurta()+'</span>' : '';
         var linhasV = det.vereadores.map(function(x){
           return '<tr><td>'+x.nome+'</td>'+
             '<td><span class="badge b-'+(x.status||'')+'">'+(x.status||'—')+'</span></td>'+
