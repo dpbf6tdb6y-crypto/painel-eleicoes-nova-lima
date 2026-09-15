@@ -2,10 +2,13 @@
 """
 Le o log de acesso do Caddy e mostra quem entrou/saiu do painel e quando.
 
-Uso na VPS:
+Uso na VPS (linha de comando, saida em texto):
     python3 /srv/painel-eleicoes/_vps/ver_acessos.py
     python3 /srv/painel-eleicoes/_vps/ver_acessos.py --dias 7
     python3 /srv/painel-eleicoes/_vps/ver_acessos.py --usuario jucilei
+
+Uso pelo cron (grava JSON pro painel ler, na tela "Acessos"):
+    python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json
 
 Depende do bloco de log configurado no Caddyfile (ver _vps/COMO_ATIVAR_LOG.txt).
 """
@@ -13,24 +16,16 @@ import json, sys, datetime, argparse, urllib.parse
 
 LOG = "/var/log/caddy/eleicoes-access.log"
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dias", type=int, default=0, help="só mostra os últimos N dias (0 = tudo)")
-    ap.add_argument("--usuario", default=None, help="filtra por login")
-    ap.add_argument("--arquivo", default=LOG)
-    args = ap.parse_args()
-
+def coleta(arquivo, dias=0, usuario=None):
     corte = None
-    if args.dias:
-        corte = datetime.datetime.now() - datetime.timedelta(days=args.dias)
+    if dias:
+        corte = datetime.datetime.now().timestamp() - dias * 86400
 
-    linhas = []
+    eventos = []
     try:
-        f = open(args.arquivo, encoding="utf-8", errors="ignore")
+        f = open(arquivo, encoding="utf-8", errors="ignore")
     except FileNotFoundError:
-        print("Não achei o arquivo de log:", args.arquivo)
-        print("Veja _vps/COMO_ATIVAR_LOG.txt para configurar o Caddy.")
-        sys.exit(1)
+        return None
 
     with f:
         for linha in f:
@@ -44,30 +39,56 @@ def main():
             uri = (d.get("request") or {}).get("uri", "")
             if "/_log/login" not in uri and "/_log/logout" not in uri:
                 continue
-            evento = "entrou " if "/_log/login" in uri else "saiu   "
+            evento = "login" if "/_log/login" in uri else "logout"
             q = urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query)
             login = (q.get("u") or [""])[0]
-            if args.usuario and login != args.usuario:
+            if usuario and login != usuario:
                 continue
-            ip = (d.get("request") or {}).get("remote_ip", "?")
             ts = d.get("ts")
             if ts is None:
                 continue
-            dt = datetime.datetime.fromtimestamp(ts)
-            if corte and dt < corte:
+            if corte and ts < corte:
                 continue
-            linhas.append((dt, evento, login, ip))
+            ip = (d.get("request") or {}).get("remote_ip", "?")
+            eventos.append({"ts": ts, "evento": evento, "login": login, "ip": ip})
 
-    linhas.sort(key=lambda x: x[0])
-    if not linhas:
-        print("Nenhum acesso registrado" + (f" para '{args.usuario}'" if args.usuario else "") + ".")
+    eventos.sort(key=lambda x: x["ts"])
+    return eventos
+
+def imprime(eventos):
+    if not eventos:
+        print("Nenhum acesso registrado.")
         return
-
-    print(f"{'DATA/HORA':<20}{'EVENTO':<10}{'LOGIN':<18}IP")
+    def pad(s, n): s = str(s); return s + " " * max(0, n - len(s))
+    print(pad("DATA/HORA", 20) + pad("EVENTO", 10) + pad("LOGIN", 18) + "IP")
     print("-" * 62)
-    for dt, evento, login, ip in linhas:
-        print(f"{dt.strftime('%d/%m/%Y %H:%M:%S'):<20}{evento:<10}{login:<18}{ip}")
-    print(f"\nTotal: {len(linhas)} evento(s)")
+    for e in eventos:
+        dt = datetime.datetime.fromtimestamp(e["ts"]).strftime("%d/%m/%Y %H:%M:%S")
+        ev = "entrou" if e["evento"] == "login" else "saiu"
+        print(pad(dt, 20) + pad(ev, 10) + pad(e["login"], 18) + e["ip"])
+    print(f"\nTotal: {len(eventos)} evento(s)")
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dias", type=int, default=0, help="só os últimos N dias (0 = tudo)")
+    ap.add_argument("--usuario", default=None, help="filtra por login")
+    ap.add_argument("--arquivo", default=LOG)
+    ap.add_argument("--json", default=None, help="grava um .json (pra o painel ler) em vez de imprimir")
+    args = ap.parse_args()
+
+    eventos = coleta(args.arquivo, args.dias, args.usuario)
+    if eventos is None:
+        msg = f"Não achei o arquivo de log: {args.arquivo}\nVeja _vps/COMO_ATIVAR_LOG.txt para configurar o Caddy."
+        if args.json:
+            print(msg, file=sys.stderr); sys.exit(1)
+        print(msg); sys.exit(1)
+
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as f:
+            json.dump(eventos, f, ensure_ascii=False)
+        print(f"Gravado {len(eventos)} evento(s) em {args.json}")
+    else:
+        imprime(eventos)
 
 if __name__ == "__main__":
     main()

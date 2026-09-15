@@ -46,7 +46,24 @@ python3 /srv/painel-eleicoes/_vps/ver_acessos.py
 Deve aparecer uma linha com login "teste".
 
 ------------------------------------------------
-3) Usar no dia a dia
+3) Ligar o relatório dentro do painel (tela "Acessos")
+------------------------------------------------
+A tela "Acessos" do painel le um arquivo site/acessos.json. Ele NAO
+e gerado sozinho - precisa desse cron rodando na VPS a cada 5 minutos:
+
+( crontab -l 2>/dev/null | grep -v ver_acessos.py ; \
+  echo "*/5 * * * * /usr/bin/python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json >/dev/null 2>&1" \
+) | crontab -
+
+Testar na hora (sem esperar o cron):
+python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json
+curl -s https://eleicoes.gavix.tech/acessos.json | head -c 200
+
+Pronto: abra o painel -> Acessos -> "Relatório de acessos" -> escolhe as
+datas -> Gerar relatório.
+
+------------------------------------------------
+4) Usar pelo terminal (sem abrir o painel)
 ------------------------------------------------
 python3 /srv/painel-eleicoes/_vps/ver_acessos.py                # tudo
 python3 /srv/painel-eleicoes/_vps/ver_acessos.py --dias 7       # últimos 7 dias

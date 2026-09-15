@@ -114,6 +114,9 @@
   .painel h3 .tot{font-weight:500;font-size:11.5px;color:var(--suave);background:#f0f3f7;
     border-radius:20px;padding:1px 9px;margin-left:6px;white-space:nowrap}
   .painel-full{margin-top:16px}
+  .rel-saida{background:#f5f8fc;border:1px solid var(--linha);border-radius:8px;padding:12px;
+    font:12px/1.6 ui-monospace,Consolas,monospace;overflow:auto;max-height:440px;white-space:pre;
+    color:var(--texto);margin:0}
   .pdet-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 12px}
   .pdet-card{background:#f5f8fc;border:1px solid var(--linha);border-radius:8px;padding:9px 12px}
   .pdet-card .rot{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
@@ -894,7 +897,58 @@
           '<button class="btn btn-verde" id="btAdd" style="margin-top:6px">Adicionar</button>'+
           '<div class="lg-erro" id="acErro" hidden></div>'+
         '</div>'+
+      '</div>'+
+      '<div class="painel painel-full">'+
+        '<h3>Relatório de acessos</h3>'+
+        '<div class="dica">Quem entrou e saiu do painel, com data e hora. Atualiza sozinho a cada poucos minutos.</div>'+
+        '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:8px 0 12px">'+
+          '<div><label class="ac-lbl">De</label><input type="date" id="relDe" class="barra-busca" style="width:auto"></div>'+
+          '<div><label class="ac-lbl">Até</label><input type="date" id="relAte" class="barra-busca" style="width:auto"></div>'+
+          '<button class="btn btn-verde" id="btRelatorio">Gerar relatório</button>'+
+          '<span class="mr" id="relStatus"></span>'+
+        '</div>'+
+        '<pre id="relSaida" class="rel-saida">Escolha as datas e clique em “Gerar relatório”.</pre>'+
       '</div>';
+
+    (function(){
+      var hoje = new Date(), seteDias = new Date(hoje.getTime() - 7*86400000);
+      function iso(d){ return d.toISOString().slice(0,10); }
+      document.getElementById('relDe').value = iso(seteDias);
+      document.getElementById('relAte').value = iso(hoje);
+    })();
+    function padStr(s,n){ s=String(s==null?'':s); return s.length>=n ? s+' ' : s + ' '.repeat(n-s.length); }
+    function montaRelatorio(lista){
+      if(!lista.length) return 'Nenhum acesso registrado nesse período.';
+      var out = padStr('DATA/HORA',20) + padStr('EVENTO',9) + padStr('LOGIN',18) + 'IP\n';
+      out += '-'.repeat(62) + '\n';
+      lista.forEach(function(x){
+        var dt = new Date(x.ts*1000);
+        var ds = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR');
+        out += padStr(ds,20) + padStr(x.evento==='login'?'entrou':'saiu',9) + padStr(x.login,18) + (x.ip||'') + '\n';
+      });
+      out += '\nTotal: ' + lista.length + ' evento(s)';
+      return out;
+    }
+    document.getElementById('btRelatorio').onclick = function(){
+      var de = document.getElementById('relDe').value;
+      var ate = document.getElementById('relAte').value;
+      var saida = document.getElementById('relSaida'), status = document.getElementById('relStatus');
+      status.textContent = 'Carregando…'; saida.textContent = '';
+      fetch('acessos.json?_=' + Date.now(), { cache:'no-store' })
+        .then(function(r){ if(!r.ok) throw new Error('sem arquivo'); return r.json(); })
+        .then(function(lista){
+          var deTs  = de  ? new Date(de + 'T00:00:00').getTime()  : -Infinity;
+          var ateTs = ate ? new Date(ate + 'T23:59:59').getTime() :  Infinity;
+          var filt = lista.filter(function(x){ var t = x.ts*1000; return t>=deTs && t<=ateTs; });
+          filt.sort(function(a,b){ return a.ts-b.ts; });
+          saida.textContent = montaRelatorio(filt);
+          status.textContent = 'Atualizado agora · ' + filt.length + ' evento(s)';
+        })
+        .catch(function(){
+          saida.textContent = 'Ainda não há relatório disponível.\nConfigure o log na VPS (arquivo _vps/COMO_ATIVAR_LOG.txt) — depois disso ele fica pronto sozinho.';
+          status.textContent = '';
+        });
+    };
 
     document.getElementById('btAdd').onclick = function(){
       var nome = (document.getElementById('acNome').value||'').trim();

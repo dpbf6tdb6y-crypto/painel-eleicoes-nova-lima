@@ -2,3 +2,5 @@
 site/*.b64.txt
 *.zip
 ~$*
+# gerado na VPS pelo cron (_vps/ver_acessos.py --json) - nao versionar
+site/acessos.json
