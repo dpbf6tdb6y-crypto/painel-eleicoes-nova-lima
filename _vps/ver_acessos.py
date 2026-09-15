@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Le o log de acesso do Caddy e mostra quem entrou/saiu do painel e quando.
+Mostra quem entrou/saiu do painel e quando, lendo o log do Caddy pelo journal
+do systemd (journalctl -u caddy) — sem depender de arquivo/permissão nenhuma.
 
 Uso na VPS (linha de comando, saida em texto):
     python3 /srv/painel-eleicoes/_vps/ver_acessos.py
@@ -10,47 +11,44 @@ Uso na VPS (linha de comando, saida em texto):
 Uso pelo cron (grava JSON pro painel ler, na tela "Acessos"):
     python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json
 
-Depende do bloco de log configurado no Caddyfile (ver _vps/COMO_ATIVAR_LOG.txt).
+Depende do bloco de log configurado no Caddyfile (ver _vps/COMO_ATIVAR_LOG.txt) —
+so precisa de "log { format json }" no bloco eleicoes.gavix.tech, sem "output file".
 """
-import json, sys, datetime, argparse, urllib.parse
+import json, sys, datetime, argparse, urllib.parse, subprocess
 
-LOG = "/var/log/caddy/eleicoes-access.log"
-
-def coleta(arquivo, dias=0, usuario=None):
-    corte = None
+def coleta(dias=0, usuario=None):
+    cmd = ["journalctl", "-u", "caddy", "-o", "cat", "--no-pager"]
     if dias:
-        corte = datetime.datetime.now().timestamp() - dias * 86400
-
-    eventos = []
+        cmd += ["--since", f"{dias} days ago"]
     try:
-        f = open(arquivo, encoding="utf-8", errors="ignore")
-    except FileNotFoundError:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except Exception as e:
+        print(f"Não consegui ler o journal do caddy: {e}", file=sys.stderr)
         return None
 
-    with f:
-        for linha in f:
-            linha = linha.strip()
-            if not linha or "/_log/" not in linha:
-                continue
-            try:
-                d = json.loads(linha)
-            except Exception:
-                continue
-            uri = (d.get("request") or {}).get("uri", "")
-            if "/_log/login" not in uri and "/_log/logout" not in uri:
-                continue
-            evento = "login" if "/_log/login" in uri else "logout"
-            q = urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query)
-            login = (q.get("u") or [""])[0]
-            if usuario and login != usuario:
-                continue
-            ts = d.get("ts")
-            if ts is None:
-                continue
-            if corte and ts < corte:
-                continue
-            ip = (d.get("request") or {}).get("remote_ip", "?")
-            eventos.append({"ts": ts, "evento": evento, "login": login, "ip": ip})
+    eventos = []
+    for linha in proc.stdout.splitlines():
+        linha = linha.strip()
+        if not linha or "/_log/" not in linha:
+            continue
+        try:
+            d = json.loads(linha)
+        except Exception:
+            continue
+        req = d.get("request") or {}
+        uri = req.get("uri", "")
+        if "/_log/login" not in uri and "/_log/logout" not in uri:
+            continue
+        evento = "login" if "/_log/login" in uri else "logout"
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query)
+        login = (q.get("u") or [""])[0]
+        if usuario and login != usuario:
+            continue
+        ts = d.get("ts")
+        if ts is None:
+            continue
+        ip = req.get("remote_ip", "?")
+        eventos.append({"ts": ts, "evento": evento, "login": login, "ip": ip})
 
     eventos.sort(key=lambda x: x["ts"])
     return eventos
@@ -70,18 +68,14 @@ def imprime(eventos):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dias", type=int, default=0, help="só os últimos N dias (0 = tudo)")
+    ap.add_argument("--dias", type=int, default=0, help="só os últimos N dias (0 = tudo que o journal ainda tiver)")
     ap.add_argument("--usuario", default=None, help="filtra por login")
-    ap.add_argument("--arquivo", default=LOG)
     ap.add_argument("--json", default=None, help="grava um .json (pra o painel ler) em vez de imprimir")
     args = ap.parse_args()
 
-    eventos = coleta(args.arquivo, args.dias, args.usuario)
+    eventos = coleta(args.dias, args.usuario)
     if eventos is None:
-        msg = f"Não achei o arquivo de log: {args.arquivo}\nVeja _vps/COMO_ATIVAR_LOG.txt para configurar o Caddy."
-        if args.json:
-            print(msg, file=sys.stderr); sys.exit(1)
-        print(msg); sys.exit(1)
+        sys.exit(1)
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as f:

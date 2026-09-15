@@ -1,55 +1,65 @@
 ========================================================
-  LOG DE ACESSO (quem entrou e quando) - configurar 1 vez na VPS
+  LOG DE ACESSO (quem entrou e quando) - VPS
 ========================================================
 
 O painel manda um "aviso" pro servidor toda vez que alguem loga ou sai
 (pedido pra /_log/login?u=LOGIN ou /_log/logout?u=LOGIN). Esse pedido nao
 busca nada (da 404), mas fica registrado no log do Caddy com data/hora e IP.
 
+O log vai pela SAIDA PADRAO do Caddy (journal do systemd) - NUNCA por
+arquivo. Ja tivemos um incidente (15/09/2026) usando "output file": o
+arquivo de log nasceu com dono errado (root em vez de caddy) e derrubou
+gavix.tech + segov.gavix.tech + eleicoes.gavix.tech por uns minutos.
+Log por journal nao tem esse risco (sem arquivo, sem dono, sem permissao).
+
+REGRA DE OURO: nesse Caddy (compartilhado com gavix.tech e segov.gavix.tech),
+so usar "systemctl reload caddy" - NUNCA "systemctl restart caddy". O reload,
+se a config nova tiver problema, so recusa e mantem a antiga rodando (sem
+derrubar nada). O restart para o processo e so depois tenta subir de novo -
+se falhar, fica tudo fora do ar.
+
 ------------------------------------------------
-1) Criar a pasta de log e ativar no Caddy
+1) Ativar no Caddy (uma vez só)
 ------------------------------------------------
 Colar na VPS:
-
-mkdir -p /var/log/caddy
-chown caddy:caddy /var/log/caddy 2>/dev/null || true
 
 cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak-$(date +%s)
 
 python3 - <<'EOF'
-import re
 p = "/etc/caddy/Caddyfile"
 s = open(p, encoding="utf-8").read()
 bloco_antigo = "eleicoes.gavix.tech {\n\troot * /srv/painel-eleicoes/site\n\tfile_server"
-bloco_novo   = ("eleicoes.gavix.tech {\n\troot * /srv/painel-eleicoes/site\n\tfile_server\n"
-                "\tlog {\n\t\toutput file /var/log/caddy/eleicoes-access.log {\n"
-                "\t\t\troll_size 10mb\n\t\t\troll_keep 5\n\t\t}\n\t\tformat json\n\t}")
-if "output file /var/log/caddy/eleicoes-access.log" in s:
-    print("log ja estava configurado, nada a fazer")
+bloco_novo   = "eleicoes.gavix.tech {\n\troot * /srv/painel-eleicoes/site\n\tfile_server\n\tlog {\n\t\tformat json\n\t}"
+if "\tlog {\n\t\tformat json\n\t}" in s:
+    print("log ja configurado, nada a fazer")
 elif bloco_antigo in s:
     s = s.replace(bloco_antigo, bloco_novo, 1)
     open(p, "w", encoding="utf-8").write(s)
-    print("bloco de log inserido")
+    print("bloco de log (via journal, sem arquivo) inserido")
 else:
-    print("ATENCAO: nao achei o bloco esperado do eleicoes.gavix.tech - edite o Caddyfile a mao")
+    print("ATENCAO: bloco esperado nao encontrado - nao mexi em nada")
 EOF
 
-caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy && echo ">>> CADDY OK"
+caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy && echo ">>> RELOAD OK"
 
 ------------------------------------------------
 2) Testar
 ------------------------------------------------
+curl -sI https://gavix.tech | head -1
+curl -sI https://segov.gavix.tech | head -1
+curl -sI https://eleicoes.gavix.tech | head -1
 curl -s "https://eleicoes.gavix.tech/_log/login?u=teste" > /dev/null
-ls -la /var/log/caddy/
 python3 /srv/painel-eleicoes/_vps/ver_acessos.py
 
-Deve aparecer uma linha com login "teste".
+Os 3 curl de status devem responder normal (200/307) e a última linha
+deve mostrar "teste".
 
 ------------------------------------------------
 3) Ligar o relatório dentro do painel (tela "Acessos")
 ------------------------------------------------
-A tela "Acessos" do painel le um arquivo site/acessos.json. Ele NAO
-e gerado sozinho - precisa desse cron rodando na VPS a cada 5 minutos:
+A tela "Acessos" do painel le um arquivo site/acessos.json, que é gerado
+por este cron (roda a cada 5 min, só lê o journal e grava o JSON - não
+mexe no Caddy nem precisa de permissão especial):
 
 ( crontab -l 2>/dev/null | grep -v ver_acessos.py ; \
   echo "*/5 * * * * /usr/bin/python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json >/dev/null 2>&1" \
@@ -62,10 +72,18 @@ curl -s https://eleicoes.gavix.tech/acessos.json | head -c 200
 Pronto: abra o painel -> Acessos -> "Relatório de acessos" -> escolhe as
 datas -> Gerar relatório.
 
+Obs: o journal do systemd guarda um tempo limitado de histórico (dias a
+poucas semanas, dependendo do espaço em disco) - não é um arquivo que
+cresce pra sempre. Pra guardar mais tempo, o cron de 5 em 5 minutos vai
+acumulando o JSON, mas cada rodada dele sobrescreve com o que o journal
+tiver na hora - ele não soma o histórico. Se um dia precisar de retenção
+maior, aí sim se justifica voltar a pensar num arquivo próprio (com
+cuidado extra de permissão dessa vez).
+
 ------------------------------------------------
 4) Usar pelo terminal (sem abrir o painel)
 ------------------------------------------------
-python3 /srv/painel-eleicoes/_vps/ver_acessos.py                # tudo
+python3 /srv/painel-eleicoes/_vps/ver_acessos.py                # tudo que o journal tiver
 python3 /srv/painel-eleicoes/_vps/ver_acessos.py --dias 7       # últimos 7 dias
 python3 /srv/painel-eleicoes/_vps/ver_acessos.py --usuario jucilei
 
