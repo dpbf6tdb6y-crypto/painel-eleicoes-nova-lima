@@ -957,7 +957,19 @@
     return null;
   }
 
+  // registra login/saída no log de acesso do Caddy (a VPS já grava data/hora/IP de cada
+  // requisição; esse pedido não busca nada, só fica marcado no log). Nunca trava a tela.
+  function registrarEvento(ev, usuario){
+    var u = usuario || st.usuario;
+    if(!u || !u.login) return;
+    try{
+      var url = '/_log/'+ev+'?u='+encodeURIComponent(u.login);
+      fetch(url, { method:'GET', mode:'no-cors', cache:'no-store', keepalive:true }).catch(function(){});
+    }catch(e){}
+  }
+
   function sair(motivo){
+    registrarEvento('logout');
     try{ localStorage.removeItem('pnl_auth'); }catch(e){}
     try{ if(motivo) sessionStorage.setItem('pnl_saida', motivo); }catch(e){}
     location.reload();
@@ -990,6 +1002,7 @@
     document.getElementById('login').hidden = true;
     document.getElementById('app').hidden = false;
     ultimoToque = 0; armarInatividade();
+    registrarEvento('login', usuario);
     render();
   }
 

@@ -1,0 +1,55 @@
+========================================================
+  LOG DE ACESSO (quem entrou e quando) - configurar 1 vez na VPS
+========================================================
+
+O painel manda um "aviso" pro servidor toda vez que alguem loga ou sai
+(pedido pra /_log/login?u=LOGIN ou /_log/logout?u=LOGIN). Esse pedido nao
+busca nada (da 404), mas fica registrado no log do Caddy com data/hora e IP.
+
+------------------------------------------------
+1) Criar a pasta de log e ativar no Caddy
+------------------------------------------------
+Colar na VPS:
+
+mkdir -p /var/log/caddy
+chown caddy:caddy /var/log/caddy 2>/dev/null || true
+
+cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak-$(date +%s)
+
+python3 - <<'EOF'
+import re
+p = "/etc/caddy/Caddyfile"
+s = open(p, encoding="utf-8").read()
+bloco_antigo = "eleicoes.gavix.tech {\n\troot * /srv/painel-eleicoes/site\n\tfile_server"
+bloco_novo   = ("eleicoes.gavix.tech {\n\troot * /srv/painel-eleicoes/site\n\tfile_server\n"
+                "\tlog {\n\t\toutput file /var/log/caddy/eleicoes-access.log {\n"
+                "\t\t\troll_size 10mb\n\t\t\troll_keep 5\n\t\t}\n\t\tformat json\n\t}")
+if "output file /var/log/caddy/eleicoes-access.log" in s:
+    print("log ja estava configurado, nada a fazer")
+elif bloco_antigo in s:
+    s = s.replace(bloco_antigo, bloco_novo, 1)
+    open(p, "w", encoding="utf-8").write(s)
+    print("bloco de log inserido")
+else:
+    print("ATENCAO: nao achei o bloco esperado do eleicoes.gavix.tech - edite o Caddyfile a mao")
+EOF
+
+caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy && echo ">>> CADDY OK"
+
+------------------------------------------------
+2) Testar
+------------------------------------------------
+curl -s "https://eleicoes.gavix.tech/_log/login?u=teste" > /dev/null
+ls -la /var/log/caddy/
+python3 /srv/painel-eleicoes/_vps/ver_acessos.py
+
+Deve aparecer uma linha com login "teste".
+
+------------------------------------------------
+3) Usar no dia a dia
+------------------------------------------------
+python3 /srv/painel-eleicoes/_vps/ver_acessos.py                # tudo
+python3 /srv/painel-eleicoes/_vps/ver_acessos.py --dias 7       # últimos 7 dias
+python3 /srv/painel-eleicoes/_vps/ver_acessos.py --usuario jucilei
+
+Ou peça pro Claude: "quem acessou o painel essa semana?"
