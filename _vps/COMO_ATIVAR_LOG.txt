@@ -58,11 +58,12 @@ deve mostrar "teste".
 3) Ligar o relatório dentro do painel (tela "Acessos")
 ------------------------------------------------
 A tela "Acessos" do painel le um arquivo site/acessos.json, que é gerado
-por este cron (roda a cada 5 min, só lê o journal e grava o JSON - não
-mexe no Caddy nem precisa de permissão especial):
+por este cron (roda 1x por dia, às 03:00 da VPS [meia-noite no Brasil],
+só lê o journal e grava o JSON - não mexe no Caddy nem precisa de
+permissão especial):
 
 ( crontab -l 2>/dev/null | grep -v ver_acessos.py ; \
-  echo "*/5 * * * * /usr/bin/python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json >/dev/null 2>&1" \
+  echo "0 3 * * * /usr/bin/python3 /srv/painel-eleicoes/_vps/ver_acessos.py --json /srv/painel-eleicoes/site/acessos.json >/dev/null 2>&1" \
 ) | crontab -
 
 Testar na hora (sem esperar o cron):
@@ -72,13 +73,17 @@ curl -s https://eleicoes.gavix.tech/acessos.json | head -c 200
 Pronto: abra o painel -> Acessos -> "Relatório de acessos" -> escolhe as
 datas -> Gerar relatório.
 
-Obs: o journal do systemd guarda um tempo limitado de histórico (dias a
+Obs 1: o relatório no painel mostra o que tiver no acessos.json daquela
+última rodada do dia - ou seja, pode ficar até ~24h desatualizado. Se
+precisar do dado fresco na hora, rode o comando de "testar na hora" acima.
+
+Obs 2: o journal do systemd guarda um tempo limitado de histórico (dias a
 poucas semanas, dependendo do espaço em disco) - não é um arquivo que
-cresce pra sempre. Pra guardar mais tempo, o cron de 5 em 5 minutos vai
-acumulando o JSON, mas cada rodada dele sobrescreve com o que o journal
-tiver na hora - ele não soma o histórico. Se um dia precisar de retenção
-maior, aí sim se justifica voltar a pensar num arquivo próprio (com
-cuidado extra de permissão dessa vez).
+cresce pra sempre. A cada rodada, o cron sobrescreve o JSON com o que o
+journal tiver naquele momento - ele não soma o histórico de rodadas
+anteriores. Se um dia precisar de retenção maior que o journal guarda,
+aí sim se justifica voltar a pensar num arquivo próprio (com cuidado
+extra de permissão dessa vez).
 
 ------------------------------------------------
 4) Usar pelo terminal (sem abrir o painel)
