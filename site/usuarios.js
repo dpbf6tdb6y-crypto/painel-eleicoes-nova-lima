@@ -4,7 +4,7 @@ window.USUARIOS = [
   {
     "nome": "Jucilei Nunes Ferreira",
     "login": "jucilei",
-    "h": "b2b769e3",
+    "h": "bd23e12b",
     "admin": true
   },
   {
