@@ -201,7 +201,8 @@
   var CORES = {azul:'#2f5597', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
 
   var st = { rota:'menu', pageId:null, selCand:null, selMacros:[], selMicros:[], selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
-  var acessosEdit = null;   // cópia de trabalho da lista de usuários (tela Acessos)
+  var acessosEdit = null;    // cópia de trabalho da lista de usuários (tela Acessos)
+  var acessosAviso = null;   // mensagem de "salvo/copiado" a mostrar uma vez, no topo da tela Acessos
   var buscaTimer=null;
   function limpaCharts(){
     try{ Object.values(Chart.instances||{}).forEach(function(c){ try{c.destroy();}catch(e){} }); }catch(e){}
@@ -856,6 +857,16 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
   }
+  // copia o texto sozinho (sem precisar clicar em "Copiar" à parte) e guarda um aviso
+  // pra aparecer no topo da tela depois do render() — é o "salvar" que faltava.
+  function autoSalvar(msg){
+    acessosAviso = msg;
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(textoUsuarios(acessosEdit)).catch(function(){});
+      }
+    }catch(e){}
+  }
 
   function renderAcessos(v){
     if(!(st.usuario && st.usuario.admin)){ v.innerHTML = '<p style="padding:20px">Área restrita.</p>'; return; }
@@ -869,9 +880,16 @@
           '<a class="lnk-rem" data-i="'+i+'">remover</a>') + '</td></tr>';
     }).join('');
 
+    var avisoHtml = '';
+    if(acessosAviso){
+      avisoHtml = '<div class="escopo-nota" style="background:#eaf6ea;border-color:#bfe3c0;color:#2f7d32">'+acessosAviso+'</div>';
+      acessosAviso = null;   // mostra só uma vez
+    }
+
     v.innerHTML =
       '<div class="topo"><div><h1>Acessos</h1>'+
         '<div class="sub">Quem pode abrir o painel. Você define a senha e envia para a pessoa.</div></div></div>'+
+      avisoHtml+
       '<div class="escopo-nota">Adicione as pessoas abaixo. Depois, clique em <b>Copiar</b> e '+
         '<b>cole o texto aqui no chat comigo</b> — eu publico e em segundos vale para todos. '+
         '(Enquanto não publicar, o acesso novo só funciona neste navegador.)</div>'+
@@ -960,13 +978,19 @@
       if(acessosEdit.some(function(u){ return u.login===login; })){ err.textContent='Já existe alguém com esse login.'; err.hidden=false; return; }
       acessosEdit.push({ nome:nome, login:login, h:_h(login+'::'+senha) });
       window.USUARIOS = acessosEdit.slice();   // vale já neste navegador (some ao recarregar se não publicar)
+      autoSalvar('✅ <b>'+esc(nome)+'</b> adicionado(a) — o texto já foi <b>copiado</b> sozinho. '+
+        'Agora é só <b>colar aqui no chat comigo</b> que eu salvo de vez (ou use "baixar como .txt" abaixo).');
       render();
     };
     v.querySelectorAll('.lnk-rem').forEach(function(a){
       a.onclick = function(){
         var i = +a.dataset.i;
-        if(confirm('Remover o acesso de "'+acessosEdit[i].nome+'"?')){
-          acessosEdit.splice(i,1); window.USUARIOS = acessosEdit.slice(); render();
+        var nomeRem = acessosEdit[i].nome;
+        if(confirm('Remover o acesso de "'+nomeRem+'"?')){
+          acessosEdit.splice(i,1); window.USUARIOS = acessosEdit.slice();
+          autoSalvar('🗑️ <b>'+esc(nomeRem)+'</b> removido(a) — o texto já foi <b>copiado</b> sozinho. '+
+            'Cole aqui no chat comigo pra eu salvar de vez.');
+          render();
         }
       };
     });
