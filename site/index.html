@@ -776,11 +776,27 @@
 
   function alturaGrafico(n){ return Math.max(140, n*25 + 26); }
 
-  // "Nome  (PARTIDO)"  ->  ["Nome", "(PARTIDO)"]  (2 linhas no eixo Y)
+  // fonte única pro eixo Y: o que é medido tem que ser o que é desenhado
+  var FONTE_TICK = '"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif';
+  var MAX_CH_LINHA = 24;   // máx. de caracteres por linha do rótulo
+
+  // quebra um nome em até 2 linhas, sem cortar palavra ("Carlos Henrique Alves" / "Da Silva")
+  function quebraPalavras(txt, max){
+    if(txt.length <= max) return [txt];
+    var pal = txt.split(' '), l1 = '', i = 0;
+    while(i < pal.length && (l1 + (l1 ? ' ' : '') + pal[i]).length <= max){ l1 += (l1 ? ' ' : '') + pal[i]; i++; }
+    if(!l1){ l1 = pal[0].slice(0, max); i = 1; }          // palavra única gigante
+    var resto = pal.slice(i).join(' ');
+    if(resto.length > max) resto = resto.slice(0, max - 1) + '…';
+    return resto ? [l1, resto] : [l1];
+  }
+  // "Nome  (PARTIDO)" -> nome (até 2 linhas) + partido; o partido só entra se o nome coube em 1 linha
   function quebraRotulo(s){
     s = String(s);
     var m = s.match(/^(.*?)\s+\((.+)\)\s*$/);
-    return m ? [m[1], '(' + m[2] + ')'] : s;
+    var linhas = quebraPalavras(m ? m[1] : s, MAX_CH_LINHA);
+    if(m && linhas.length === 1) linhas.push('(' + m[2] + ')');
+    return linhas.length === 1 ? linhas[0] : linhas;
   }
 
   function desenhaBarras(canvasId, labels, valores, cores, onClick){
@@ -799,20 +815,20 @@
         scales:{
           x:{ ticks:{ callback:function(v){ return fmt.format(v); }, font:{size:10} }, grid:{color:'#eef1f5'} },
           y:{
-            ticks:{ font:{size:10.5}, autoSkip:false,
+            ticks:{ font:{size:10.5, family:FONTE_TICK}, autoSkip:false,
               callback:function(v){ return quebraRotulo(this.getLabelForValue(v)); } },
             grid:{display:false},
             afterFit:function(sc){
-              // reserva largura suficiente pro maior nome (1a linha), no máximo metade do gráfico
+              // reserva largura pra MAIOR LINHA já quebrada (mesma fonte do desenho), até 55% do gráfico
               var ctx = sc.chart.ctx; ctx.save();
-              ctx.font = '10.5px "Segoe UI",system-ui,sans-serif';
+              ctx.font = '10.5px ' + FONTE_TICK;
               var w = 0;
               labels.forEach(function(l){
-                var t = String(l).replace(/\s+\(.+\)\s*$/, '');
-                w = Math.max(w, ctx.measureText(t).width);
+                var q = quebraRotulo(l);
+                (Array.isArray(q) ? q : [q]).forEach(function(ln){ w = Math.max(w, ctx.measureText(ln).width); });
               });
               ctx.restore();
-              sc.width = Math.max(sc.width, Math.min(Math.ceil(w) + 16, sc.chart.width * 0.5));
+              sc.width = Math.max(sc.width, Math.min(Math.ceil(w) + 14, sc.chart.width * 0.55));
             }
           }
         },
