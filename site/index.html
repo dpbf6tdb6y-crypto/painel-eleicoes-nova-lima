@@ -248,7 +248,8 @@
              '<span class="nav-grp-seta">▸</span>'+label+'</div>'+
            '<div class="nav-sub"'+(aberto?'':' hidden')+'>';
       grupos[label].forEach(function(p){
-        h += '<a data-page="'+p.id+'" class="'+(st.pageId===p.id&&st.rota==='pagina'?'ativo':'')+'">'+ p.titulo +'</a>';
+        h += '<a data-page="'+p.id+'" class="'+(st.pageId===p.id&&st.rota==='pagina'?'ativo':'')+'">'+ p.titulo +
+          (p.pendente ? ' <span class="mr" style="font-size:10px">(em breve)</span>' : '') + '</a>';
       });
       h += '</div>';
     });
@@ -524,9 +525,25 @@
     return t;
   }
 
+  // página "reservada" no menu, mas sem dados ainda (ex.: eleição futura antes do resultado)
+  function renderPaginaPendente(v, p){
+    var cargo = p.titulo.replace(/^.*—\s*/, '').replace(/\s*\(\d{4}\)\s*$/, '') || p.titulo;
+    v.innerHTML =
+      '<div class="topo"><div><h1>'+p.titulo+'</h1>'+
+        '<div class="sub">'+(D.municipio||'Nova Lima / MG')+' · Fonte TRE-MG</div></div></div>'+
+      '<div class="painel" style="max-width:560px;margin:30px auto;text-align:center;padding:44px 30px">'+
+        '<div style="font-size:42px">🗳️</div>'+
+        '<h3 style="margin-top:14px">Aguardando resultado oficial</h3>'+
+        '<p class="dica" style="margin-top:10px;font-size:13px">Este espaço já está pronto no painel. '+
+        'Assim que o TRE-MG divulgar a apuração de <b>'+esc(cargo)+'</b> e a planilha for atualizada com esses '+
+        'dados, os gráficos e a tabela de bairros aparecem aqui sozinhos — não precisa mexer em mais nada na tela.</p>'+
+      '</div>';
+  }
+
   function renderPagina(v, p){
     if(!p){ v.innerHTML='<p>Página não encontrada.</p>'; return; }
     limpaCharts();
+    if(p.pendente){ renderPaginaPendente(v, p); return; }
     var k = kpisAtuais(p);
     var perc = k.aptos ? (100*k.comparecimento/k.aptos) : 0;
     var brancos = contaEspecial(p, ['branco','voto branco']);

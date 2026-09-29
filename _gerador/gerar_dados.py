@@ -224,7 +224,28 @@ pg["titulo"] = "Vereador — Votação por partido e região"
 pg["vista"] = "partido"
 paginas.append(pg)
 
-# 5-10. Eleicoes 2022
+# 5-10. Eleicoes 2022 e 2026 (mesma estrutura: cargo/turno -> aba da planilha)
+# Se a aba ainda nao existe (ex.: 2026 antes da eleicao), a pagina entra "pendente":
+# fica reservada no menu com um aviso, sem quebrar o gerador. Quando a aba chegar
+# na planilha, roda o gerador de novo e ela vira pagina normal sozinha.
+def monta_grupo_cargos(cfg):
+    for pid, grupo, titulo, aba, cols in cfg:
+        d = sheet(aba)
+        if d is None:
+            paginas.append({
+                "id": pid, "grupo": grupo, "titulo": titulo, "pendente": True,
+                "kpis": {}, "kpis_micro": {}, "tem_regiao": False,
+                "candidatos": [], "cruzamento": [],
+            })
+            print(f"  [{pid}] SEM DADOS AINDA (aba '{aba}' nao encontrada na planilha) -> pagina reservada/pendente")
+            continue
+        d.columns = [str(c).strip() for c in d.columns]
+        paginas.append(build_pagina(pid, grupo, titulo, d,
+            ccand=pick(d, *cols), cvot=pick(d,"Votos","Voto"),
+            csec=pick(d,"nr_secao","Seçao","Secao"),
+            kpi_mode="secao",
+            kpi_cols=("apto","comparec","absten","nomin")))
+
 cfg2022 = [
     ("presidente_1t_2022", "Eleições 2022", "Presidente — 1º turno (2022)", "5 - Presidente 1 turno", ("Nome","Candidato")),
     ("presidente_2t_2022", "Eleições 2022", "Presidente — 2º turno (2022)", "6 - Presidente 2 turno", ("Candidato","Nome")),
@@ -233,16 +254,23 @@ cfg2022 = [
     ("dep_federal_2022",   "Eleições 2022", "Deputado Federal (2022)",       "2 Deputado Federal",      ("Candidato","Nome")),
     ("dep_estadual_2022",  "Eleições 2022", "Deputado Estadual (2022)",      "1 Deputado Estadual",     ("Candidato","Nome")),
 ]
-for pid, grupo, titulo, aba, cols in cfg2022:
-    d = sheet(aba)
-    if d is None:
-        print("  !! aba nao encontrada:", aba); continue
-    d.columns = [str(c).strip() for c in d.columns]
-    paginas.append(build_pagina(pid, grupo, titulo, d,
-        ccand=pick(d, *cols), cvot=pick(d,"Votos","Voto"),
-        csec=pick(d,"nr_secao","Seçao","Secao"),
-        kpi_mode="secao",
-        kpi_cols=("apto","comparec","absten","nomin")))
+monta_grupo_cargos(cfg2022)
+
+# Eleicoes 2026 — mesma estrutura de 2022. Abas esperadas na planilha (crie do
+# mesmo jeito que as de 2022, so acrescentando " 2026" no nome da aba):
+#   "5 - Presidente 1 turno 2026", "6 - Presidente 2 turno 2026", "Governador 2026",
+#   "3 Senador 2026", "2 Deputado Federal 2026", "1 Deputado Estadual 2026"
+# mesmas colunas que as abas de 2022 (nr_secao/Seçao, Nome ou Candidato, Votos/Voto,
+# aptos/comparecimento/abstencoes/nominais).
+cfg2026 = [
+    ("presidente_1t_2026", "Eleições 2026", "Presidente — 1º turno (2026)", "5 - Presidente 1 turno 2026", ("Nome","Candidato")),
+    ("presidente_2t_2026", "Eleições 2026", "Presidente — 2º turno (2026)", "6 - Presidente 2 turno 2026", ("Candidato","Nome")),
+    ("governador_2026",    "Eleições 2026", "Governador (2026)",             "Governador 2026",              ("Candidato","Nome")),
+    ("senador_2026",       "Eleições 2026", "Senador (2026)",                "3 Senador 2026",               ("Nome","Candidato")),
+    ("dep_federal_2026",   "Eleições 2026", "Deputado Federal (2026)",       "2 Deputado Federal 2026",      ("Candidato","Nome")),
+    ("dep_estadual_2026",  "Eleições 2026", "Deputado Estadual (2026)",      "1 Deputado Estadual 2026",     ("Candidato","Nome")),
+]
+monta_grupo_cargos(cfg2026)
 
 # ---------- monta dados.js ----------
 DADOS = {

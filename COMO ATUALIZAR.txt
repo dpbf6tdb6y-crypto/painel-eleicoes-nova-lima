@@ -20,11 +20,36 @@ DAR ACESSO A OUTRAS PESSOAS:
 
 
 ------------------------------------------------
+ELEICOES 2026 - ja reservado no menu, falta so a planilha
+------------------------------------------------
+2026 e ano de eleicao geral (igual 2022): Presidente, Governador, Senador,
+Deputado Federal e Deputado Estadual. As 6 paginas ja aparecem no menu, em
+"Eleicoes 2026", marcadas "(em breve)" com um aviso de "aguardando resultado".
+
+Quando sair o resultado oficial do TRE-MG, adicione estas abas na MESMA
+planilha (planilhas\Arquivo das eleicoes.xlsx), com as mesmas colunas que
+as abas equivalentes de 2022 ja tem (nr_secao/Seçao, Nome ou Candidato,
+Votos/Voto, aptos/comparecimento/abstencoes/nominais):
+
+  "5 - Presidente 1 turno 2026"   (igual "5 - Presidente 1 turno")
+  "6 - Presidente 2 turno 2026"   (igual "6 - Presidente 2 turno")
+  "Governador 2026"               (igual "Governador")
+  "3 Senador 2026"                (igual "3 Senador")
+  "2 Deputado Federal 2026"       (igual "2 Deputado Federal")
+  "1 Deputado Estadual 2026"      (igual "1 Deputado Estadual")
+
+Dai e so rodar o gerador (passo 2 abaixo) de novo: cada pagina que achar
+a aba correspondente vira pagina normal sozinha, com grafico e tudo -
+nao precisa mexer no site\index.html nem me chamar pra isso.
+
+
+------------------------------------------------
 ATUALIZAR OS DADOS (nova eleicao) - fluxo igual ao segov
 ------------------------------------------------
 No SEU PC (PowerShell), na pasta desta pasta:
 
-  1. Substitua planilhas\Arquivo das eleicoes.xlsx pela nova (mesmas abas/colunas)
+  1. Substitua/complete planilhas\Arquivo das eleicoes.xlsx (mesmas abas/colunas
+     de sempre, mais as abas novas de 2026 quando existirem)
 
   2. cd _gerador ; python gerar_dados.py
      (precisa: python -m pip install pandas openpyxl)
