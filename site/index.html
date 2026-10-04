@@ -188,6 +188,7 @@
 <script src="chart.umd.min.js"></script>
 <script src="dados.js"></script>
 <script src="usuarios.js"></script>
+<script src="secoes.js"></script>
 <script>
 (function(){
   "use strict";
@@ -255,7 +256,8 @@
     });
     h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>';
     if(st.usuario && st.usuario.admin){
-      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos</a>';
+      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos</a>'+
+        '<a data-rota="secoes" class="'+(st.rota==='secoes'?'ativo':'')+'">Seções 2026</a>';
     }
     nav.innerHTML = h;
 
@@ -463,6 +465,7 @@
     var v = document.getElementById('view');
     if(st.rota==='regioes') return renderRegioes(v);
     if(st.rota==='acessos') return renderAcessos(v);
+    if(st.rota==='secoes') return renderSecoes(v);
     if(st.rota==='pagina') return renderPagina(v, pg(st.pageId));
     return renderMenu(v);
   }
@@ -1043,6 +1046,146 @@
         catch(e){ document.getElementById('acStatus').textContent = 'Selecione o texto e copie (Ctrl+C).'; }
       }
     };
+  }
+
+  /* ---------------- tela Seções 2026 (só admin) ---------------- */
+  var secEdit = null, secAviso = null, secBusca = '', secSoPend = false, secEditando = null;
+  function secPendCampo(v){ return !v || /^A (CONFIRMAR|DEFINIR)$/.test(v); }
+  function secPend(s){ return secPendCampo(s.loc) || secPendCampo(s.end) || secPendCampo(s.macro) || secPendCampo(s.micro); }
+  function textoSecoes(l){
+    return '// Secoes de votacao de Nova Lima em 2026. Editado pela tela "Seções 2026" (admin).\n' +
+      '// Publicar: substituir site/secoes.js por este conteudo -> git push + git pull na VPS.\n' +
+      'window.SECOES = ' + JSON.stringify(l, null, 1) + ';\n';
+  }
+  function csvSecoes(l){
+    function q(x){ return '"'+String(x==null?'':x).replace(/"/g,'""')+'"'; }
+    return '﻿' + 'Seção;Local;Endereço;Macro região;Micro região\r\n' +
+      l.map(function(s){ return [s.s,s.loc,s.end,s.macro,s.micro].map(q).join(';'); }).join('\r\n');
+  }
+  function baixarArq(nome, txt, tipo){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([txt], {type:tipo+';charset=utf-8'}));
+    a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  }
+  // guarda rascunho no navegador e copia o texto sozinho (mesmo fluxo da tela Acessos)
+  function secSalva(msg){
+    secAviso = msg;
+    try{ localStorage.setItem('pnl_secoes_rascunho', JSON.stringify(secEdit)); }catch(e){}
+    try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(textoSecoes(secEdit)).catch(function(){}); }catch(e){}
+  }
+  function renderSecoes(v){
+    if(!(st.usuario && st.usuario.admin)){ v.innerHTML = '<p style="padding:20px">Área restrita.</p>'; return; }
+    if(!secEdit){
+      var base = JSON.parse(JSON.stringify(window.SECOES||[])), rasc = null;
+      try{ rasc = JSON.parse(localStorage.getItem('pnl_secoes_rascunho')||'null'); }catch(e){}
+      secEdit = (rasc && rasc.length) ? rasc : base;
+    }
+    var macros = {}, micros = {};
+    secEdit.forEach(function(s){
+      if(!secPendCampo(s.macro)) macros[s.macro]=1;
+      if(!secPendCampo(s.micro)) micros[s.micro]=s.macro;
+    });
+    var npend = secEdit.filter(secPend).length;
+    var q = secBusca.toLowerCase();
+    var lista = secEdit.map(function(s,i){ return {s:s,i:i}; }).filter(function(x){
+      if(secSoPend && !secPend(x.s)) return false;
+      if(!q) return true;
+      return (x.s.s+' '+x.s.loc+' '+x.s.end+' '+x.s.macro+' '+x.s.micro).toLowerCase().indexOf(q) >= 0;
+    });
+    function cel(val){ return secPendCampo(val) ? '<td style="background:#fff2a8">'+esc(val||'—')+'</td>' : '<td>'+esc(val)+'</td>'; }
+    var linhas = lista.map(function(x){
+      return '<tr><td><b>'+esc(x.s.s)+'</b></td>'+cel(x.s.loc)+cel(x.s.end)+cel(x.s.macro)+cel(x.s.micro)+
+        '<td class="num" style="white-space:nowrap"><a class="lnk-ed" data-i="'+x.i+'" style="cursor:pointer;color:#2f5597">editar</a> · '+
+        '<a class="lnk-ex" data-i="'+x.i+'" style="cursor:pointer;color:#b3261e">excluir</a></td></tr>';
+    }).join('') || '<tr><td colspan="6" class="mr">Nenhuma seção encontrada.</td></tr>';
+
+    var ed = secEditando!=null ? secEdit[secEditando] : {s:'',loc:'',end:'',macro:'',micro:''};
+    function val(x){ return secPendCampo(x) ? '' : x; }
+    var avisoHtml = '';
+    if(secAviso){ avisoHtml = '<div class="escopo-nota" style="background:#eaf6ea;border-color:#bfe3c0;color:#2f7d32">'+secAviso+'</div>'; secAviso = null; }
+
+    v.innerHTML =
+      '<div class="topo"><div><h1>Seções 2026</h1>'+
+        '<div class="sub">Local, endereço e região de cada seção de votação de Nova Lima. '+secEdit.length+' seções · '+
+        (npend?'<b style="color:#b3721e">'+npend+' com pendência</b>':'tudo preenchido')+'</div></div></div>'+
+      avisoHtml+
+      '<div class="escopo-nota">Crie, edite ou exclua seções. A cada mudança o texto é <b>copiado sozinho</b> — '+
+        '<b>cole aqui no chat comigo</b> que eu publico e atualizo a planilha. Até publicar, a alteração fica só neste navegador. '+
+        'Células em <span style="background:#fff2a8;padding:0 4px">amarelo</span> estão pendentes.</div>'+
+      '<div class="grade" style="grid-template-columns:2fr 1fr">'+
+        '<div class="painel">'+
+          '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
+            '<input class="barra-busca" id="seBusca" placeholder="Buscar seção, local, região…" value="'+escAttr(secBusca)+'" style="flex:1;min-width:180px">'+
+            '<label style="font-size:12.5px"><input type="checkbox" id="sePend"'+(secSoPend?' checked':'')+'> só pendentes</label></div>'+
+          '<div class="scrollbox" style="max-height:560px"><table class="tab"><thead><tr><th>Seção</th><th>Local</th><th>Endereço</th><th>Macro</th><th>Micro</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div>'+
+          '<div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+            '<button class="btn btn-verde" id="seCopiar">📋 Copiar para publicar</button>'+
+            '<a id="seTxt" style="cursor:pointer;color:#2f5597;text-decoration:underline;font-size:12.5px">baixar secoes.js (.txt)</a>'+
+            '<a id="seCsv" style="cursor:pointer;color:#2f5597;text-decoration:underline;font-size:12.5px">baixar planilha (.csv, abre no Excel)</a>'+
+            '<a id="seDesf" style="cursor:pointer;color:#b3261e;text-decoration:underline;font-size:12.5px">descartar alterações não publicadas</a>'+
+            '<span class="mr" id="seStatus"></span></div>'+
+        '</div>'+
+        '<div class="painel">'+
+          '<h3>'+(secEditando!=null?'Editar seção '+esc(ed.s):'Nova seção')+'</h3>'+
+          '<label class="ac-lbl">Seção (número)</label><input class="barra-busca" id="seNum" placeholder="Ex.: 0317" value="'+escAttr(ed.s)+'"'+(secEditando!=null?' readonly':'')+'>'+
+          '<label class="ac-lbl">Local de votação</label><input class="barra-busca" id="seLoc" placeholder="Ex.: ESCOLA MUNICIPAL…" value="'+escAttr(val(ed.loc))+'">'+
+          '<label class="ac-lbl">Endereço</label><input class="barra-busca" id="seEnd" placeholder="Rua, número" value="'+escAttr(val(ed.end))+'">'+
+          '<label class="ac-lbl">Macro região</label><input class="barra-busca" id="seMacro" list="dlMacro" value="'+escAttr(val(ed.macro))+'">'+
+          '<datalist id="dlMacro">'+Object.keys(macros).sort().map(function(m){ return '<option value="'+escAttr(m)+'">'; }).join('')+'</datalist>'+
+          '<label class="ac-lbl">Micro região</label><input class="barra-busca" id="seMicro" list="dlMicro" value="'+escAttr(val(ed.micro))+'">'+
+          '<datalist id="dlMicro">'+Object.keys(micros).sort().map(function(m){ return '<option value="'+escAttr(m)+'">'; }).join('')+'</datalist>'+
+          '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-verde" id="seSalvar">'+(secEditando!=null?'Salvar alteração':'Adicionar')+'</button>'+
+          (secEditando!=null?'<button class="btn" id="seCancelar">Cancelar</button>':'')+'</div>'+
+          '<div class="lg-erro" id="seErro" hidden></div>'+
+        '</div>'+
+      '</div>';
+
+    var $ = function(id){ return document.getElementById(id); };
+    $('seBusca').oninput = function(){
+      secBusca = this.value; var p = this.selectionStart; render();
+      var n = $('seBusca'); n.focus(); try{ n.setSelectionRange(p,p); }catch(e){}
+    };
+    $('sePend').onchange = function(){ secSoPend = this.checked; render(); };
+    // ao escolher uma micro conhecida, preenche a macro dela
+    $('seMicro').onchange = function(){ if(micros[this.value] && !$('seMacro').value) $('seMacro').value = micros[this.value]; };
+    $('seSalvar').onclick = function(){
+      var num = ($('seNum').value||'').replace(/\D/g,''), err = $('seErro');
+      if(!num || num.length>4){ err.textContent='Informe o número da seção (até 4 dígitos).'; err.hidden=false; return; }
+      num = ('0000'+num).slice(-4);
+      var reg = { s:num, loc:($('seLoc').value||'').trim().toUpperCase() || 'A CONFIRMAR', end:($('seEnd').value||'').trim() || 'A CONFIRMAR',
+                  macro:($('seMacro').value||'').trim() || 'A DEFINIR', micro:($('seMicro').value||'').trim() || 'A DEFINIR' };
+      if(secEditando!=null){
+        secEdit[secEditando] = reg; secEditando = null;
+        secSalva('✏️ Seção <b>'+num+'</b> alterada — o texto já foi <b>copiado</b>. Cole aqui no chat comigo pra eu publicar.');
+      } else {
+        if(secEdit.some(function(s){ return s.s===num; })){ err.textContent='A seção '+num+' já existe. Use "editar".'; err.hidden=false; return; }
+        secEdit.push(reg); secEdit.sort(function(a,b){ return a.s<b.s?-1:1; });
+        secSalva('✅ Seção <b>'+num+'</b> adicionada — o texto já foi <b>copiado</b>. Cole aqui no chat comigo pra eu publicar.');
+      }
+      render();
+    };
+    if($('seCancelar')) $('seCancelar').onclick = function(){ secEditando = null; render(); };
+    v.querySelectorAll('.lnk-ed').forEach(function(a){ a.onclick = function(){ secEditando = +a.dataset.i; render(); window.scrollTo(0,0); }; });
+    v.querySelectorAll('.lnk-ex').forEach(function(a){ a.onclick = function(){
+      var i = +a.dataset.i, n = secEdit[i].s;
+      if(confirm('Excluir a seção '+n+'?')){
+        secEdit.splice(i,1); secEditando = null;
+        secSalva('🗑️ Seção <b>'+n+'</b> excluída — o texto já foi <b>copiado</b>. Cole aqui no chat comigo pra eu publicar.');
+        render();
+      } }; });
+    $('seCopiar').onclick = function(){
+      var ok = function(){ $('seStatus').textContent = 'Copiado! Cole no chat com o Claude.'; };
+      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(textoSecoes(secEdit)).then(ok, function(){ $('seStatus').textContent='Use "baixar secoes.js".'; });
+      else $('seStatus').textContent = 'Use "baixar secoes.js".';
+    };
+    $('seTxt').onclick = function(){ baixarArq('secoes-js.txt', textoSecoes(secEdit), 'text/plain'); $('seStatus').textContent='Baixado (renomeie para secoes.js em site\\ e publique).'; };
+    $('seCsv').onclick = function(){ baixarArq('Secoes 2026.csv', csvSecoes(secEdit), 'text/csv'); };
+    $('seDesf').onclick = function(){
+      if(confirm('Descartar as alterações que ainda não foram publicadas?')){
+        try{ localStorage.removeItem('pnl_secoes_rascunho'); }catch(e){}
+        secEdit = null; secEditando = null; render();
+      } };
   }
 
   /* ---------------- controle de acesso (multiusuário) ---------------- */

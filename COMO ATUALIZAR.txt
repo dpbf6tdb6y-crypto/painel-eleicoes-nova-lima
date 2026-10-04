@@ -44,6 +44,18 @@ nao precisa mexer no site\index.html nem me chamar pra isso.
 
 
 ------------------------------------------------
+SECOES 2026 (local, endereco, macro e micro regiao)
+------------------------------------------------
+Menu lateral -> Administracao -> "Secoes 2026" (so admin).
+Ali voce cria, edita e exclui secoes. A cada mudanca o texto e copiado sozinho:
+cole no chat com o Claude que ele grava em site\secoes.js e publica.
+(Ou "baixar secoes.js (.txt)", renomeie para secoes.js em site\, git push + git pull na VPS.)
+Celulas amarelas = pendentes (A CONFIRMAR / A DEFINIR).
+O gerador (gerar_dados.py) usa site\secoes.js como mapa de regioes das paginas de 2026
+e grava uma copia em planilhas\Secoes 2026.xlsx para conferencia.
+
+
+------------------------------------------------
 ATUALIZAR OS DADOS (nova eleicao) - fluxo igual ao segov
 ------------------------------------------------
 No SEU PC (PowerShell), na pasta desta pasta:

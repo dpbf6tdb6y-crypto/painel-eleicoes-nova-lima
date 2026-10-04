@@ -270,6 +270,29 @@ cfg2026 = [
     ("dep_federal_2026",   "Eleições 2026", "Deputado Federal (2026)",       "2 Deputado Federal 2026",      ("Candidato","Nome")),
     ("dep_estadual_2026",  "Eleições 2026", "Deputado Estadual (2026)",      "1 Deputado Estadual 2026",     ("Candidato","Nome")),
 ]
+# Regioes de 2026: vem de site/secoes.js (tela "Seções 2026" do painel), nao da aba
+# "0 - Regioes" (que e o mapa de 2022/2024). Secao sem regiao definida fica fora do
+# cruzamento por regiao ate ser preenchida.
+def le_secoes_2026():
+    cam = os.path.join(RAIZ, "site", "secoes.js")
+    if not os.path.exists(cam):
+        return []
+    txt = open(cam, encoding="utf-8").read()
+    return json.loads(txt[txt.index("window.SECOES =") + len("window.SECOES ="):].strip().rstrip(";"))
+
+secoes26 = le_secoes_2026()
+if secoes26:
+    ok = [s for s in secoes26 if s.get("micro") and not s["micro"].startswith("A ")]
+    sec2micro_2022 = sec2micro
+    sec2micro = {int(s["s"]): s["micro"] for s in ok}
+    for s in ok:
+        micro2macro.setdefault(s["micro"], s["macro"])
+    print(f"  Secoes 2026: {len(secoes26)} cadastradas, {len(ok)} com regiao definida")
+    # copia em planilha para conferencia (a fonte de verdade e site/secoes.js)
+    os.makedirs(os.path.join(RAIZ, "planilhas"), exist_ok=True)
+    pd.DataFrame([{"Seção": s["s"], "Local": s["loc"], "Endereço": s["end"],
+                   "Macro região": s["macro"], "Micro região": s["micro"]} for s in secoes26]
+                 ).to_excel(os.path.join(RAIZ, "planilhas", "Seções 2026.xlsx"), index=False)
 monta_grupo_cargos(cfg2026)
 
 # ---------- monta dados.js ----------
