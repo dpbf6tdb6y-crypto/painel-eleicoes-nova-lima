@@ -117,6 +117,32 @@ def baixa_secao(sec):
         return sec, None
 
 
+ZONA_ELE = {1: "6257", 3: "6259", 5: "6259", 6: "6259", 7: "6259"}
+
+
+def zona_cargo(cod):
+    """Totais da zona (apuracao oficial do TSE, costuma estar a frente dos boletins por urna)."""
+    ele = ZONA_ELE[cod]
+    url = ("https://resultados.tse.jus.br/oficial/ele2026/%s/dados/mg/mg48950-z0194-c000%d-e00%s-u.jws?nocache=%d"
+           % (ele, cod, ele, int(time.time())))
+    b = get(url)
+    if not b:
+        return None
+    z = jws(b)
+    cand, leg = {}, {}
+    for a in (z.get("carg") or [{}])[0].get("agr", []):
+        for pt in a.get("par", []):
+            leg[pt["n"]] = int(pt.get("tvtl") or 0)
+            for cd in pt.get("cand", []):
+                cand[cd["n"]] = int(cd.get("vap") or 0)
+    e, v, s = z.get("e", {}), z.get("v", {}), z.get("s", {})
+    return {"hora": "%s %s" % (z.get("dg", ""), z.get("hg", "")), "secTot": int(s.get("ts") or 0),
+            "secApur": int(s.get("st") or 0), "pApur": s.get("pst") or "0,00",
+            "aptos": int(e.get("est") or 0) or int(e.get("te") or 0), "comp": int(e.get("c") or 0),
+            "abst": int(e.get("a") or 0), "nom": int(v.get("vnom") or 0), "br": int(v.get("vb") or 0),
+            "nu": int(v.get("vn") or 0), "cand": cand, "leg": leg}
+
+
 def main():
     txt = open(os.path.join(SITE, "secoes.js"), encoding="utf-8").read()
     secoes = [s["s"] for s in json.loads(txt[txt.index("window.SECOES =") + 15:].strip().rstrip(";"))]
@@ -132,13 +158,22 @@ def main():
         for sec, d in ex.map(baixa_secao, pend):
             if d:
                 atual[sec] = d; novas += 1
-    out = {"gerado_ts": int(time.time()), "gerado_em": time.strftime("%Y-%m-%d %H:%M:%S"), "total": len(secoes),
+    zona = {}
+    for cod in ZONA_ELE:
+        try:
+            z = zona_cargo(cod)
+            if z:
+                zona[str(cod)] = z
+        except Exception as ex:
+            print("  erro na zona do cargo", cod, ex)
+    out = {"zona": zona, "gerado_ts": int(time.time()), "gerado_em": time.strftime("%Y-%m-%d %H:%M:%S"), "total": len(secoes),
            "recebidas": len(atual), "secoes": atual}
     tmp = SAIDA + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, separators=(",", ":"))
     os.replace(tmp, SAIDA)
-    print(f"{time.strftime('%d/%m %H:%M:%S')}  +{novas} novas · {len(atual)} de {len(secoes)} urnas · {os.path.getsize(SAIDA)//1024} KB")
+    zc = zona.get("1", {})
+    print(f"{time.strftime('%d/%m %H:%M:%S')}  +{novas} novas · {len(atual)} de {len(secoes)} boletins · zona: {zc.get('secApur', '?')} secoes apuradas · {os.path.getsize(SAIDA)//1024} KB")
 
 
 if __name__ == "__main__":

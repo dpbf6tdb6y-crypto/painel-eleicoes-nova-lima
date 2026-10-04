@@ -665,27 +665,66 @@
     p.candidatos.sort(function(a,b){ return b.votos - a.votos; });
     _metaCache = {};
   }
+  /* --- total do município: a apuração por zona do TSE costuma estar À FRENTE dos boletins por urna --- */
+  var zonaCache = {};   // código do cargo -> totais compactos da zona
+  var ZONA_ELE = { 1:'6257', 3:'6259', 5:'6259', 6:'6259', 7:'6259' };
+  function zonaUrlCargo(cod){ return 'https://resultados.tse.jus.br/oficial/ele2026/'+ZONA_ELE[cod]+'/dados/mg/mg48950-z0194-c000'+cod+'-e00'+ZONA_ELE[cod]+'-u.jws'; }
+  function zonaCompacta(z){
+    var cand = {}, leg = {};
+    (((z.carg||[])[0]||{agr:[]}).agr).forEach(function(a){ (a.par||[]).forEach(function(pt){
+      leg[pt.n] = +pt.tvtl || 0;
+      (pt.cand||[]).forEach(function(cd){ cand[cd.n] = +cd.vap || 0; });
+    }); });
+    var e = z.e||{}, v = z.v||{}, s = z.s||{};
+    return { hora:(z.dg||'')+' '+(z.hg||''), secTot:+s.ts||0, secApur:+s.st||0, pApur:s.pst||'0,00',
+             aptos:(+e.est||0) || (+e.te||0), comp:+e.c||0, abst:+e.a||0, nom:+v.vnom||0, br:+v.vb||0, nu:+v.vn||0, cand:cand, leg:leg };
+  }
+  function zonaBaixa(){
+    return Promise.all(Object.keys(CARGO_COD).map(function(id){
+      var cod = CARGO_COD[id];
+      return fetch(zonaUrlCargo(cod)+'?nocache='+Date.now(), { cache:'no-store' })
+        .then(function(r){ return r.ok ? r.text() : null; })
+        .then(function(tx){ if(tx) zonaCache[cod] = zonaCompacta(liveDecode(tx)); })
+        .catch(function(){});
+    }));
+  }
+  // junta as duas fontes: totais da zona (mais atuais) + região/bairro dos boletins já liberados
+  function aplicaTudo(p){
+    var cod = CARGO_COD[p.id], zc = zonaCache[cod], nbu = Object.keys(secCache).length;
+    if(nbu) liveAplicaSecoes(p);
+    if(zc && zc.secApur > nbu){
+      var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; });
+      Object.keys(zc.cand).forEach(function(n){ if(por[n]) por[n].votos = zc.cand[n]; });
+      Object.keys(zc.leg).forEach(function(n){ if(!(n in zc.cand) && por[n]) por[n].votos = zc.leg[n]; });
+      p.candidatos.sort(function(a,b){ return b.votos - a.votos; });
+      p.kpis = { aptos:zc.aptos, comparecimento:zc.comp, abstencoes:zc.abst, nominais:zc.nom };
+      p.live = { modo:'zona', brancos:zc.br, nulos:zc.nu, secTot:zc.secTot, secApur:zc.secApur, pApur:zc.pApur,
+                 hora:zc.hora, nbu:nbu };
+      _metaCache = {};
+    }
+  }
+  function liveAplicaTodas(){ Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q) aplicaTudo(q); }); }
+
   function liveAtualiza(){
     var p = pg(st.pageId);
     if(!p || !LIVE_CFG[p.id] || liveBusy) return;
     liveBusy = true; liveMsg = 'Consultando o TSE…'; livePinta();
     var pend = (window.SECOES||[]).map(function(s){ return s.s; }).filter(function(s){ return !secCache[s]; });
     var feitas = 0;
-    pool(pend, 12, function(sec){
-      return buBaixa(sec).then(function(d){ if(d) secCache[sec] = d; feitas++; liveMsg = 'Consultando o TSE… '+feitas+'/'+pend.length; livePinta(); });
-    }).then(function(){
-      // as urnas valem para todos os cargos: atualiza as 5 páginas de uma vez
-      if(Object.keys(secCache).length){ Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q) liveAplicaSecoes(q); }); return null; }
-      // nenhuma urna recebida ainda: mostra ao menos o total do município (arquivo da zona)
-      return fetch(liveUrl(p.id) + '?nocache=' + Date.now(), { cache:'no-store' })
-        .then(function(r){ if(!r.ok) throw new Error('TSE ainda não publicou ('+r.status+')'); return r.text(); })
-        .then(function(tx){ liveAplica(p, liveDecode(tx)); });
-    }).then(function(){ liveMsg = ''; liveBusy = false; render(); })
-      .catch(function(e){ liveMsg = 'Não consegui atualizar: ' + e.message; liveBusy = false; livePinta(); });
+    Promise.all([
+      zonaBaixa(),
+      pool(pend, 12, function(sec){
+        return buBaixa(sec).then(function(d){ if(d) secCache[sec] = d; feitas++; liveMsg = 'Consultando o TSE… '+feitas+'/'+pend.length; livePinta(); });
+      })
+    ]).then(function(){
+      if(!Object.keys(secCache).length && !Object.keys(zonaCache).length) throw new Error('o TSE ainda não publicou nada');
+      liveAplicaTodas(); liveMsg = ''; liveBusy = false; render();
+    }).catch(function(e){ liveMsg = 'Não consegui atualizar: ' + e.message; liveBusy = false; livePinta(); });
   }
+
   // Abre já com a última apuração que o servidor guardou (site/apuracao.json, atualizado de 5 em 5 min
   // por _vps/atualizar_apuracao.py) — assim ninguém entra com tudo zerado.
-  var apuracaoTimer = null, apuracaoN = -1;
+  var apuracaoTimer = null, apuracaoChave = '';
   function carregaApuracao(){
     fetch('apuracao.json?_=' + Date.now(), { cache:'no-store' })
       .then(function(r){ return r.ok ? r.json() : null; })
@@ -697,13 +736,14 @@
           Object.keys(d.cargos).forEach(function(c){ cg[c] = d.cargos[c].map(function(a){ return { t:a[0], q:a[1], p:a[2], n:a[3] }; }); });
           secCache[sec] = { aptos:d.aptos, comp:d.comp, cargos:cg };
         });
-        var n = Object.keys(secCache).length;
-        if(!n || n === apuracaoN) return;
-        apuracaoN = n;
-        Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q) liveAplicaSecoes(q); });
+        Object.keys(j.zona||{}).forEach(function(c){ zonaCache[c] = j.zona[c]; });
+        var chave = Object.keys(secCache).length + '|' + (j.gerado_ts||0);
+        if(chave === apuracaoChave || (!Object.keys(secCache).length && !Object.keys(zonaCache).length)) return;
+        apuracaoChave = chave;
+        liveAplicaTodas();
         var h = j.gerado_ts ? new Date(j.gerado_ts * 1000).toLocaleTimeString('pt-BR') : '';
-        Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q && q.live && h) q.live.hora = h + ' (servidor)'; });
-        if(LIVE_CFG[st.pageId] || st.rota === 'pagina') render();
+        Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q && q.live && h) q.live.servidor = h; });
+        if(st.rota === 'pagina') render();
       }).catch(function(){});
     if(!apuracaoTimer) apuracaoTimer = setInterval(carregaApuracao, 300000);
   }
@@ -714,15 +754,22 @@
   }
   function liveBarraHtml(p){
     if(!LIVE_CFG[p.id]) return '';
-    var L = p.live;
-    var info = L ? (L.modo==='secoes' ? ('Urnas recebidas: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · atualizado às '+esc(L.hora))
-                              : ('Apuração: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · dados do TSE de '+esc(L.hora)))
-                 : 'Ainda não atualizado nesta sessão — clique em “Atualizar do TSE”.';
+    var L = p.live, info, nota = '';
+    if(!L){
+      info = 'Ainda sem apuração — clique em “Atualizar do TSE”.';
+    } else if(L.modo === 'zona'){
+      info = 'Apuração do TSE: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · TSE às '+esc((L.hora||'').split(' ')[1]||L.hora)+
+             (L.servidor ? ' · servidor às '+esc(L.servidor) : '');
+      nota = 'Totais do <b>município</b> pela apuração oficial do TSE. Região e bairro somam só as <b>'+L.nbu+'</b> urnas cujo boletim o TSE já liberou — por isso os totais por região são menores.';
+    } else {
+      info = 'Urnas recebidas: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · atualizado às '+esc(L.servidor || L.hora);
+      nota = 'Soma das <b>urnas já recebidas</b> pelo TSE, seção por seção. Região e bairro seguem o cadastro de <b>Seções 2026</b>.';
+    }
     return '<div class="escopo-nota" id="liveBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
       '<button class="btn btn-verde" id="btLive">🔄 Atualizar do TSE</button>'+
       '<label style="font-size:12.5px"><input type="checkbox" id="chLive"'+(liveAuto?' checked':'')+'> atualizar sozinho a cada 5 min</label>'+
       '<span id="liveInfo">'+info+'</span><span class="mr" id="liveMsg">'+esc(liveMsg)+'</span></div>'+
-      (L ? (L.modo==='secoes' ? '<div class="escopo-nota">Soma das <b>urnas já recebidas</b> pelo TSE, seção por seção. Região e bairro seguem o cadastro de <b>Seções 2026</b>.</div>' : '<div class="escopo-nota">Totais do <b>município inteiro</b> ao vivo pelo TSE. Nenhuma urna de Nova Lima foi recebida ainda — o detalhe por região aparece quando chegarem.</div>') : '');
+      (nota ? '<div class="escopo-nota">'+nota+'</div>' : '');
   }
   function livePinta(){
     var m = document.getElementById('liveMsg'); if(m) m.textContent = liveMsg;
