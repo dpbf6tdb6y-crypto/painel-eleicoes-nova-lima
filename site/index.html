@@ -73,7 +73,8 @@
     box-shadow:0 3px 12px rgba(232,69,44,.4);animation:pulsaLimpar 1.8s ease-in-out infinite}
   @keyframes pulsaLimpar{0%,100%{box-shadow:0 3px 12px rgba(232,69,44,.4)}50%{box-shadow:0 3px 18px rgba(232,69,44,.7)}}
 
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px;margin-bottom:12px}
+  .kpis{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  @media(max-width:1250px){.kpis{grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px}}
   .escopo-nota{background:#eef6ee;border:1px solid #cfe6cf;color:#2f7d32;border-radius:8px;
     padding:8px 12px;font-size:12.5px;margin-bottom:16px}
   .escopo-nota code{background:#dcefdc;padding:1px 4px;border-radius:3px}
@@ -94,9 +95,10 @@
   .fchip.lisa{background:transparent;border-color:transparent;color:#2f5597;font-weight:600}
   .filtros-ver select{border:1px solid var(--linha);border-radius:7px;padding:5px 8px;font-size:12.5px;background:#fff}
   td .mrx{display:block;font-size:10.5px;color:#9aa7b5}
-  .kpi{background:var(--card);border-radius:10px;padding:13px 15px;box-shadow:0 1px 3px rgba(20,40,80,.07)}
-  .kpi .rot{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
-  .kpi .val{font-size:23px;font-weight:700;margin-top:3px}
+  .kpi{background:var(--card);border-radius:10px;padding:10px 11px;box-shadow:0 1px 3px rgba(20,40,80,.07);min-width:0}
+  .kpi .rot{font-size:10px;text-transform:uppercase;letter-spacing:.02em;color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi .val{font-size:19px;font-weight:700;margin-top:2px}
+  @media(max-width:1250px){.kpi{padding:13px 15px}.kpi .rot{font-size:11px;letter-spacing:.05em;white-space:normal}.kpi .val{font-size:23px;margin-top:3px}}
   .kpi.destaque{background:linear-gradient(120deg,var(--azul),#3f6fb0);color:#fff}
   .kpi.destaque .rot{color:#d7e3f6}
   .kpi.clic{cursor:pointer;transition:box-shadow .12s,transform .12s}
@@ -827,7 +829,8 @@
               : c.status==='Eleito'?CORES.verde
               : (c.status==='Suplente'||c.status==='Legenda')?CORES.cinza
               : CORES.azul; }),
-        function(i){ st.selCand = (st.selCand===vis[i].nome)?null:vis[i].nome; st.selPart=null; render(); });
+        function(i){ st.selCand = (st.selCand===vis[i].nome)?null:vis[i].nome; st.selPart=null; render(); },
+        true);
       var b = document.getElementById('busca');
       b.oninput = function(){
         st.busca=b.value; var pos=b.selectionStart;
@@ -997,7 +1000,25 @@
     return linhas.length === 1 ? linhas[0] : linhas;
   }
 
-  function desenhaBarras(canvasId, labels, valores, cores, onClick){
+  // rotulo do ranking: "Nome" + partido bem pequeno ao lado, tudo numa linha so
+  var RX_PART = /^(.*?)\s+\((.+)\)\s*$/;
+  var rotuloNomePartido = { id:'nomePartido', afterDatasetsDraw:function(chart){
+    var ctx = chart.ctx, meta = chart.getDatasetMeta(0), area = chart.chartArea, labels = chart.data.labels;
+    ctx.save(); ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    var x = area.left - 6, maxW = area.left - 10;
+    meta.data.forEach(function(bar, i){
+      var m = String(labels[i]).match(RX_PART), nome = m ? m[1] : String(labels[i]), part = m ? m[2] : '', pw = 0;
+      if(part){ ctx.font = '8px ' + FONTE_TICK; pw = ctx.measureText(part).width + 4; }
+      ctx.font = '10.5px ' + FONTE_TICK;
+      var avail = maxW - pw, n = nome;
+      if(ctx.measureText(n).width > avail){ while(n.length > 1 && ctx.measureText(n + '…').width > avail) n = n.slice(0, -1); n += '…'; }
+      ctx.fillStyle = '#3d4654'; ctx.fillText(n, x - pw, bar.y);
+      if(part){ ctx.font = '8px ' + FONTE_TICK; ctx.fillStyle = '#8a94a3'; ctx.fillText(part, x, bar.y); }
+    });
+    ctx.restore();
+  } };
+
+  function desenhaBarras(canvasId, labels, valores, cores, onClick, comPartido){
     var el = document.getElementById(canvasId);
     if(!el) return;
     var chart = new Chart(el.getContext('2d'), {
@@ -1013,7 +1034,7 @@
         scales:{
           x:{ ticks:{ callback:function(v){ return fmt.format(v); }, font:{size:10} }, grid:{color:'#eef1f5'} },
           y:{
-            ticks:{ font:{size:10.5, family:FONTE_TICK}, autoSkip:false,
+            ticks:{ font:{size:10.5, family:FONTE_TICK}, autoSkip:false, display:!comPartido,
               callback:function(v){ return quebraRotulo(this.getLabelForValue(v)); } },
             grid:{display:false},
             afterFit:function(sc){
@@ -1021,6 +1042,14 @@
               var ctx = sc.chart.ctx; ctx.save();
               ctx.font = '10.5px ' + FONTE_TICK;
               var w = 0;
+              if(comPartido){
+                labels.forEach(function(l){
+                  var m = String(l).match(RX_PART), nm = m ? m[1] : String(l), pt = m ? m[2] : '', pw = 0;
+                  if(pt){ ctx.font = '8px ' + FONTE_TICK; pw = ctx.measureText(pt).width + 4; }
+                  ctx.font = '10.5px ' + FONTE_TICK;
+                  w = Math.max(w, ctx.measureText(nm).width + pw);
+                });
+              } else
               labels.forEach(function(l){
                 var q = quebraRotulo(l);
                 (Array.isArray(q) ? q : [q]).forEach(function(ln){ w = Math.max(w, ctx.measureText(ln).width); });
@@ -1032,7 +1061,7 @@
         },
         onClick:function(evt,els){ if(els&&els.length&&onClick) onClick(els[0].index); }
       },
-      plugins:[rotuloValor]
+      plugins: comPartido ? [rotuloValor, rotuloNomePartido] : [rotuloValor]
     });
     return chart;
   }
