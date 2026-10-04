@@ -461,6 +461,7 @@
   /* ---------------- render ---------------- */
   function render(){
     limpaCharts();
+    if(liveTimer && !(st.rota==='pagina' && LIVE_CFG[st.pageId])){ clearInterval(liveTimer); liveTimer = null; }
     montaNav();
     var v = document.getElementById('view');
     if(st.rota==='regioes') return renderRegioes(v);
@@ -529,6 +530,73 @@
   }
 
   // página "reservada" no menu, mas sem dados ainda (ex.: eleição futura antes do resultado)
+  /* ---------------- apuração ao vivo (TSE) — só páginas de 2026 ---------------- */
+  // Lê o resultado de Nova Lima direto do portal do TSE (arquivos .jws, sem login) e
+  // atualiza os totais dos candidatos na tela. Não grava nada: ao recarregar volta ao
+  // que está no dados.js. O detalhe por região/seção vem depois, da importação das seções.
+  var LIVE_CFG = {
+    presidente_1t_2026: ['6257','0001'], governador_2026: ['6259','0003'], senador_2026: ['6259','0005'],
+    dep_federal_2026: ['6259','0006'], dep_estadual_2026: ['6259','0007']
+  };
+  var liveTimer = null, liveAuto = false, liveBusy = false, liveMsg = '';
+  function liveUrl(id){ var c = LIVE_CFG[id]; return 'https://resultados.tse.jus.br/oficial/ele2026/'+c[0]+'/dados/mg/mg48950-z0194-c'+c[1]+'-e00'+c[0]+'-u.jws'; }
+  function liveDecode(txt){
+    var b = txt.trim().split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    b += '='.repeat((4 - b.length % 4) % 4);
+    var bin = atob(b), bytes = new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+  }
+  function liveAplica(p, z){
+    var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; });
+    var achou = 0, total = 0;
+    ((z.carg||[])[0]||{agr:[]}).agr.forEach(function(a){ (a.par||[]).forEach(function(pt){
+      var leg = por[pt.n]; if(leg && leg.partido===pt.sg && !(pt.cand||[]).some(function(c){ return c.n===pt.n; })){ leg.votos = +pt.tvtl||0; }
+      (pt.cand||[]).forEach(function(cd){ var c = por[cd.n]; total++; if(c){ c.votos = +cd.vap||0; achou++; } });
+    }); });
+    var e = z.e||{}, v = z.v||{}, s = z.s||{};
+    p.kpis = { aptos:+e.te||0, comparecimento:+e.c||0, abstencoes:+e.a||0, nominais:+v.vnom||0 };
+    p.live = { brancos:+v.vb||0, nulos:+v.vn||0, secTot:+s.ts||0, secApur:+s.st||0, pApur:s.pst||'0,00',
+               hora:(z.dg||'')+' '+(z.hg||''), achou:achou, total:total };
+    p.candidatos.sort(function(a,b){ return b.votos-a.votos; });
+    _metaCache = {};
+  }
+  function liveAtualiza(){
+    var p = pg(st.pageId);
+    if(!p || !LIVE_CFG[p.id] || liveBusy) return;
+    liveBusy = true; liveMsg = 'Consultando o TSE…'; livePinta();
+    fetch(liveUrl(p.id) + '?nocache=' + Date.now(), { cache:'no-store' })
+      .then(function(r){ if(!r.ok) throw new Error('TSE ainda não publicou (' + r.status + ')'); return r.text(); })
+      .then(function(t){ liveAplica(p, liveDecode(t)); liveMsg = ''; liveBusy = false; render(); })
+      .catch(function(e){ liveMsg = 'Não consegui atualizar: ' + e.message; liveBusy = false; livePinta(); });
+  }
+  function liveAutoLigaDesliga(){
+    if(liveTimer){ clearInterval(liveTimer); liveTimer = null; }
+    var p = pg(st.pageId);
+    if(liveAuto && st.rota==='pagina' && p && LIVE_CFG[p.id]) liveTimer = setInterval(liveAtualiza, 60000);
+  }
+  function liveBarraHtml(p){
+    if(!LIVE_CFG[p.id]) return '';
+    var L = p.live;
+    var info = L ? ('Apuração: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · dados do TSE de '+esc(L.hora))
+                 : 'Ainda não atualizado nesta sessão — clique em “Atualizar do TSE”.';
+    return '<div class="escopo-nota" id="liveBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
+      '<button class="btn btn-verde" id="btLive">🔄 Atualizar do TSE</button>'+
+      '<label style="font-size:12.5px"><input type="checkbox" id="chLive"'+(liveAuto?' checked':'')+'> atualizar sozinho a cada 1 min</label>'+
+      '<span id="liveInfo">'+info+'</span><span class="mr" id="liveMsg">'+esc(liveMsg)+'</span></div>'+
+      (L ? '<div class="escopo-nota">Totais do <b>município inteiro</b> ao vivo pelo TSE. Os gráficos por região e bairro serão preenchidos quando as votações por seção forem importadas.</div>' : '');
+  }
+  function livePinta(){
+    var m = document.getElementById('liveMsg'); if(m) m.textContent = liveMsg;
+    var b = document.getElementById('btLive'); if(b) b.disabled = liveBusy;
+  }
+  function liveLiga(v){
+    var b = document.getElementById('btLive'); if(!b) { liveAutoLigaDesliga(); return; }
+    b.onclick = liveAtualiza;
+    document.getElementById('chLive').onchange = function(){ liveAuto = this.checked; liveAutoLigaDesliga(); if(liveAuto) liveAtualiza(); };
+    liveAutoLigaDesliga();
+  }
+
   function renderPaginaPendente(v, p){
     var cargo = p.titulo.replace(/^.*—\s*/, '').replace(/\s*\(\d{4}\)\s*$/, '') || p.titulo;
     v.innerHTML =
@@ -551,6 +619,7 @@
     var perc = k.aptos ? (100*k.comparecimento/k.aptos) : 0;
     var brancos = contaEspecial(p, ['branco','voto branco']);
     var nulos   = contaEspecial(p, ['nulo','voto nulo']);
+    if(p.live && !temAreaFiltro()){ brancos = p.live.brancos; nulos = p.live.nulos; }
     var ehPartido = p.vista === 'partido';
     var temFV = mostraFiltrosVereador(p);
     var area = areaTexto();
@@ -572,6 +641,7 @@
         '<button class="btn btn-limpar'+(temAlgumFiltro()?' on':'')+'" id="btLimpar">'+
           (temAlgumFiltro()?'✕ Limpar seleção':'Sem filtros')+'</button>'+
       '</div>'+
+      liveBarraHtml(p)+
       (temFV ? barraFiltrosVereador(p) : '')+
       '<div class="kpis">'+
         kpi('Aptos'+rotArea, k.aptos, false, 'aptos')+
@@ -594,6 +664,7 @@
       (ehPartido && st.metrica==='votos' ? '<div class="painel painel-full" id="pnPart"></div>' : '');
 
     document.getElementById('btLimpar').onclick = function(){ limparFiltros(); render(); };
+    liveLiga(v);
 
     v.querySelectorAll('.kpi[data-met]').forEach(function(el){
       el.onclick = function(){

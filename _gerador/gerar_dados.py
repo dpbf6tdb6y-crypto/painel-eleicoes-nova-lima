@@ -30,7 +30,8 @@ def achar_planilha():
         print("Nenhuma planilha .xlsx encontrada em", PL); sys.exit(1)
     # prefere uma que contenha "eleic"
     for c in cand:
-        if "eleic" in unicodedata.normalize("NFKD", c.lower()).encode("ascii","ignore").decode():
+        nome = unicodedata.normalize("NFKD", os.path.basename(c).lower()).encode("ascii","ignore").decode()
+        if nome.startswith("arquivo") and "eleic" in nome:
             return c
     return cand[0]
 
@@ -40,10 +41,21 @@ xl = pd.ExcelFile(XLSX)
 SHEETS = xl.sheet_names
 print("Abas:", SHEETS)
 
+# Resultados de 2026 ficam em planilhas/Resultados 2026.xlsx (gerada por candidatos_2026.py
+# com os nomes e depois preenchida com os votos). A planilha principal tem prioridade.
+XLSX26 = os.path.join(PL, "Resultados 2026.xlsx")
+xl26 = pd.ExcelFile(XLSX26) if os.path.exists(XLSX26) else None
+if xl26 is not None:
+    print("Lendo tambem:", XLSX26)
+
 def sheet(nome_parcial):
     for s in SHEETS:
         if nome_parcial.lower() in s.lower():
             return xl.parse(s)
+    if xl26 is not None:
+        for s in xl26.sheet_names:
+            if nome_parcial.lower() in s.lower():
+                return xl26.parse(s)
     return None
 
 # ---------- mapa de regioes ----------
@@ -165,6 +177,14 @@ def build_pagina(pid, grupo, titulo, df, ccand, cvot, csec=None,
             m = sub[cpartido].mode()
             cand_part[nome] = str(m.iloc[0]) if not m.empty else ""
 
+    cand_num = {}
+    cnum = pick(df, "nr_votavel")
+    if cnum:
+        for nome, sub in df.groupby(ccand):
+            m = sub[cnum].mode()
+            if not m.empty:
+                cand_num[nome] = str(int(m.iloc[0]))
+
     candidatos = []
     for nome, v in g.items():
         if not nome or nome.lower() == "nan":
@@ -172,6 +192,8 @@ def build_pagina(pid, grupo, titulo, df, ccand, cvot, csec=None,
         item = {"nome": nome, "votos": int(v)}
         if nome in cand_status and cand_status[nome] and cand_status[nome].lower() != "nan":
             item["status"] = cand_status[nome]
+        if nome in cand_num:
+            item["num"] = cand_num[nome]
         if nome in cand_part and cand_part[nome] and cand_part[nome].lower() != "nan":
             item["partido"] = cand_part[nome]
         candidatos.append(item)
@@ -243,6 +265,7 @@ def monta_grupo_cargos(cfg):
         paginas.append(build_pagina(pid, grupo, titulo, d,
             ccand=pick(d, *cols), cvot=pick(d,"Votos","Voto"),
             csec=pick(d,"nr_secao","Seçao","Secao"),
+            cpartido=pick(d,"Partido"),
             kpi_mode="secao",
             kpi_cols=("apto","comparec","absten","nomin")))
 
