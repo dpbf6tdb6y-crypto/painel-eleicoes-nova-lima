@@ -186,9 +186,11 @@
 </div>
 
 <script src="chart.umd.min.js"></script>
-<script src="dados.js"></script>
-<script src="usuarios.js"></script>
-<script src="secoes.js"></script>
+<script>
+/* dados, usuarios e secoes mudam com frequencia: o ?v= (muda a cada 5 min) impede o navegador de mostrar versao velha em cache */
+(function(){ var v = Math.floor(Date.now()/300000);
+  ['dados.js','usuarios.js','secoes.js'].forEach(function(f){ document.write('<script src="'+f+'?v='+v+'"><\/script>'); }); })();
+</script>
 <script>
 (function(){
   "use strict";
