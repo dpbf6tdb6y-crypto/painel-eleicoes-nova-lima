@@ -197,6 +197,10 @@
 (function(){
   "use strict";
   var D = window.DADOS;
+  // siglas muito longas aparecem abreviadas em todo o painel (ranking, filtros, gráfico por partido)
+  var ABREV_PART = { 'REPUBLICANOS':'Rep.' };
+  function abrevPart(s){ return ABREV_PART[String(s).toUpperCase()] || s; }
+  ((D && D.paginas) || []).forEach(function(p){ (p.candidatos||[]).forEach(function(c){ if(c.partido) c.partido = abrevPart(c.partido); }); });
   if(!D){ document.getElementById('view').innerHTML =
     '<p style="padding:20px">Não encontrei <b>dados.js</b>. Rode <code>_gerador/gerar_dados.py</code> e mantenha os arquivos na mesma pasta.</p>'; return; }
 
@@ -260,8 +264,8 @@
     });
     h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>'+
       '<a data-rota="secoes" class="'+(st.rota==='secoes'?'ativo':'')+'">Seções 2026 🔒</a>';
-    if(st.usuario && st.usuario.admin){
-      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos</a>';
+    if(st.usuario && st.usuario.login==='jucilei'){
+      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos 🔒</a>';
     }
     nav.innerHTML = h;
 
@@ -555,7 +559,7 @@
     var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; });
     var achou = 0, total = 0;
     ((z.carg||[])[0]||{agr:[]}).agr.forEach(function(a){ (a.par||[]).forEach(function(pt){
-      var leg = por[pt.n]; if(leg && leg.partido===pt.sg && !(pt.cand||[]).some(function(c){ return c.n===pt.n; })){ leg.votos = +pt.tvtl||0; }
+      var leg = por[pt.n]; if(leg && leg.partido===abrevPart(pt.sg) && !(pt.cand||[]).some(function(c){ return c.n===pt.n; })){ leg.votos = +pt.tvtl||0; }
       (pt.cand||[]).forEach(function(cd){ var c = por[cd.n]; total++; if(c){ c.votos = +cd.vap||0; achou++; } });
     }); });
     var e = z.e||{}, v = z.v||{}, s = z.s||{};
@@ -1112,7 +1116,8 @@
   }
 
   function renderAcessos(v){
-    if(!(st.usuario && st.usuario.admin)){ v.innerHTML = '<p style="padding:20px">Área restrita.</p>'; return; }
+    if(!(st.usuario && st.usuario.login==='jucilei')){ v.innerHTML = '<p style="padding:20px">Área restrita.</p>'; return; }
+    if(!cadeadoSenha(v, 'Acessos')) return;
     if(!acessosEdit) acessosEdit = JSON.parse(JSON.stringify(listaUsuarios()));
 
     var linhas = acessosEdit.map(function(u, i){
@@ -1282,26 +1287,29 @@
     try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(textoSecoes(secEdit)).catch(function(){}); }catch(e){}
   }
   var secLiberado = false;   // vale ate sair do painel (sair() recarrega a pagina)
+  // cadeado das telas restritas: só a senha do Jucilei libera (vale até sair do painel)
+  function cadeadoSenha(v, titulo){
+    if(secLiberado) return true;
+    v.innerHTML =
+      '<div class="topo"><div><h1>'+titulo+'</h1><div class="sub">Área protegida — informe a senha do Jucilei.</div></div></div>'+
+      '<div class="painel" style="max-width:380px"><label class="ac-lbl">Senha do Jucilei</label>'+
+      '<input class="barra-busca" id="seSenha" type="password" autocomplete="off" placeholder="senha">'+
+      '<button class="btn btn-verde" id="seEntrar" style="margin-top:8px">Liberar</button>'+
+      '<div class="lg-erro" id="seSenhaErro" hidden>Senha incorreta.</div></div>';
+    var go = function(){
+      if(senhaAdminOk(document.getElementById('seSenha').value)){ secLiberado = true; render(); }
+      else { var e = document.getElementById('seSenhaErro'); e.hidden = false; document.getElementById('seSenha').select(); }
+    };
+    document.getElementById('seEntrar').onclick = go;
+    document.getElementById('seSenha').onkeydown = function(ev){ if(ev.key==='Enter') go(); };
+    document.getElementById('seSenha').focus();
+    return false;
+  }
   function senhaAdminOk(senha){
     return listaUsuarios().some(function(u){ return u.login === 'jucilei' && u.h === _h(u.login+'::'+String(senha||'')); });
   }
   function renderSecoes(v){
-    if(!secLiberado){
-      v.innerHTML =
-        '<div class="topo"><div><h1>Seções 2026</h1><div class="sub">Área protegida — informe a senha do Jucilei.</div></div></div>'+
-        '<div class="painel" style="max-width:380px"><label class="ac-lbl">Senha do Jucilei</label>'+
-        '<input class="barra-busca" id="seSenha" type="password" autocomplete="off" placeholder="senha">'+
-        '<button class="btn btn-verde" id="seEntrar" style="margin-top:8px">Liberar</button>'+
-        '<div class="lg-erro" id="seSenhaErro" hidden>Senha incorreta.</div></div>';
-      var go = function(){
-        if(senhaAdminOk(document.getElementById('seSenha').value)){ secLiberado = true; render(); }
-        else { var e = document.getElementById('seSenhaErro'); e.hidden = false; document.getElementById('seSenha').select(); }
-      };
-      document.getElementById('seEntrar').onclick = go;
-      document.getElementById('seSenha').onkeydown = function(ev){ if(ev.key==='Enter') go(); };
-      document.getElementById('seSenha').focus();
-      return;
-    }
+    if(!cadeadoSenha(v, 'Seções 2026')) return;
     if(!secEdit){
       var base = JSON.parse(JSON.stringify(window.SECOES||[])), rasc = null;
       try{ rasc = JSON.parse(localStorage.getItem('pnl_secoes_rascunho')||'null'); }catch(e){}
