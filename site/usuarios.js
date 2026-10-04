@@ -16,5 +16,10 @@ window.USUARIOS = [
     "nome": "Viviane",
     "login": "viviane",
     "h": "a57ff5d"
+  },
+  {
+    "nome": "Silvanio",
+    "login": "silvanio",
+    "h": "d35cf283"
   }
 ];
