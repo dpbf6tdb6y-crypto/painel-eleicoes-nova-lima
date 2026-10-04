@@ -74,7 +74,7 @@
   @keyframes pulsaLimpar{0%,100%{box-shadow:0 3px 12px rgba(232,69,44,.4)}50%{box-shadow:0 3px 18px rgba(232,69,44,.7)}}
 
   .kpis{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-bottom:12px}
-  @media(max-width:1250px){.kpis{grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px}}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px}}
   .escopo-nota{background:#eef6ee;border:1px solid #cfe6cf;color:#2f7d32;border-radius:8px;
     padding:8px 12px;font-size:12.5px;margin-bottom:16px}
   .escopo-nota code{background:#dcefdc;padding:1px 4px;border-radius:3px}
@@ -95,10 +95,11 @@
   .fchip.lisa{background:transparent;border-color:transparent;color:#2f5597;font-weight:600}
   .filtros-ver select{border:1px solid var(--linha);border-radius:7px;padding:5px 8px;font-size:12.5px;background:#fff}
   td .mrx{display:block;font-size:10.5px;color:#9aa7b5}
-  .kpi{background:var(--card);border-radius:10px;padding:13px 14px;box-shadow:0 1px 3px rgba(20,40,80,.07);min-width:0}
-  .kpi .rot{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .kpi .val{font-size:23px;font-weight:700;margin-top:3px}
-  @media(max-width:1250px){.kpi .rot{white-space:normal;letter-spacing:.05em}}
+  /* tamanho original quando ha espaco; encolhe aos poucos (zoom/janela menor) para os 8 ficarem em uma linha */
+  .kpi{background:var(--card);border-radius:10px;padding:clamp(8px,.8vw,13px) clamp(8px,.85vw,14px);box-shadow:0 1px 3px rgba(20,40,80,.07);min-width:0}
+  .kpi .rot{font-size:clamp(8.5px,.68vw,11px);text-transform:uppercase;letter-spacing:.03em;color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi .val{font-size:clamp(16px,1.45vw,23px);font-weight:700;margin-top:3px}
+  @media(max-width:900px){.kpi .rot{white-space:normal;font-size:11px}.kpi .val{font-size:23px}}
   .kpi.destaque{background:linear-gradient(120deg,var(--azul),#3f6fb0);color:#fff}
   .kpi.destaque .rot{color:#d7e3f6}
   .kpi.clic{cursor:pointer;transition:box-shadow .12s,transform .12s}
