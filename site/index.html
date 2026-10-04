@@ -254,10 +254,10 @@
       });
       h += '</div>';
     });
-    h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>';
+    h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>'+
+      '<a data-rota="secoes" class="'+(st.rota==='secoes'?'ativo':'')+'">Seções 2026 🔒</a>';
     if(st.usuario && st.usuario.admin){
-      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos</a>'+
-        '<a data-rota="secoes" class="'+(st.rota==='secoes'?'ativo':'')+'">Seções 2026</a>';
+      h += '<div class="nav-sec">Administração</div><a data-rota="acessos" class="'+(st.rota==='acessos'?'ativo':'')+'">Acessos</a>';
     }
     nav.innerHTML = h;
 
@@ -1074,8 +1074,27 @@
     try{ localStorage.setItem('pnl_secoes_rascunho', JSON.stringify(secEdit)); }catch(e){}
     try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(textoSecoes(secEdit)).catch(function(){}); }catch(e){}
   }
+  var secLiberado = false;   // vale ate sair do painel (sair() recarrega a pagina)
+  function senhaAdminOk(senha){
+    return listaUsuarios().some(function(u){ return u.login === 'jucilei' && u.h === _h(u.login+'::'+String(senha||'')); });
+  }
   function renderSecoes(v){
-    if(!(st.usuario && st.usuario.admin)){ v.innerHTML = '<p style="padding:20px">Área restrita.</p>'; return; }
+    if(!secLiberado){
+      v.innerHTML =
+        '<div class="topo"><div><h1>Seções 2026</h1><div class="sub">Área protegida — informe a senha do Jucilei.</div></div></div>'+
+        '<div class="painel" style="max-width:380px"><label class="ac-lbl">Senha do Jucilei</label>'+
+        '<input class="barra-busca" id="seSenha" type="password" autocomplete="off" placeholder="senha">'+
+        '<button class="btn btn-verde" id="seEntrar" style="margin-top:8px">Liberar</button>'+
+        '<div class="lg-erro" id="seSenhaErro" hidden>Senha incorreta.</div></div>';
+      var go = function(){
+        if(senhaAdminOk(document.getElementById('seSenha').value)){ secLiberado = true; render(); }
+        else { var e = document.getElementById('seSenhaErro'); e.hidden = false; document.getElementById('seSenha').select(); }
+      };
+      document.getElementById('seEntrar').onclick = go;
+      document.getElementById('seSenha').onkeydown = function(ev){ if(ev.key==='Enter') go(); };
+      document.getElementById('seSenha').focus();
+      return;
+    }
     if(!secEdit){
       var base = JSON.parse(JSON.stringify(window.SECOES||[])), rasc = null;
       try{ rasc = JSON.parse(localStorage.getItem('pnl_secoes_rascunho')||'null'); }catch(e){}
