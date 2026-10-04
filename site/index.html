@@ -685,7 +685,7 @@
   function liveAutoLigaDesliga(){
     if(liveTimer){ clearInterval(liveTimer); liveTimer = null; }
     var p = pg(st.pageId);
-    if(liveAuto && st.rota==='pagina' && p && LIVE_CFG[p.id]) liveTimer = setInterval(liveAtualiza, 60000);
+    if(liveAuto && st.rota==='pagina' && p && LIVE_CFG[p.id]) liveTimer = setInterval(liveAtualiza, 300000);
   }
   function liveBarraHtml(p){
     if(!LIVE_CFG[p.id]) return '';
@@ -695,7 +695,7 @@
                  : 'Ainda não atualizado nesta sessão — clique em “Atualizar do TSE”.';
     return '<div class="escopo-nota" id="liveBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
       '<button class="btn btn-verde" id="btLive">🔄 Atualizar do TSE</button>'+
-      '<label style="font-size:12.5px"><input type="checkbox" id="chLive"'+(liveAuto?' checked':'')+'> atualizar sozinho a cada 1 min</label>'+
+      '<label style="font-size:12.5px"><input type="checkbox" id="chLive"'+(liveAuto?' checked':'')+'> atualizar sozinho a cada 5 min</label>'+
       '<span id="liveInfo">'+info+'</span><span class="mr" id="liveMsg">'+esc(liveMsg)+'</span></div>'+
       (L ? (L.modo==='secoes' ? '<div class="escopo-nota">Soma das <b>urnas já recebidas</b> pelo TSE, seção por seção. Região e bairro seguem o cadastro de <b>Seções 2026</b>.</div>' : '<div class="escopo-nota">Totais do <b>município inteiro</b> ao vivo pelo TSE. Nenhuma urna de Nova Lima foi recebida ainda — o detalhe por região aparece quando chegarem.</div>') : '');
   }
