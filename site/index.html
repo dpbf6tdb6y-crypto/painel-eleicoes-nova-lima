@@ -563,13 +563,117 @@
     p.candidatos.sort(function(a,b){ return b.votos-a.votos; });
     _metaCache = {};
   }
+  /* --- urna por urna: lê o Boletim de Urna (BU) de cada seção já recebida pelo TSE --- */
+  var CARGO_COD = { presidente_1t_2026:1, governador_2026:3, senador_2026:5, dep_federal_2026:6, dep_estadual_2026:7 };
+  var secCache = {};   // '0005' -> { aptos, comp, cargos:{ 1:[{t,q,p,n}], ... } }   (BU recebido nunca muda)
+  var BU_BASE = 'https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/dados/mg/48950/0194/';
+  // leitor mínimo de ASN.1 BER (formato do BU)
+  function berLe(b, s, e){
+    var out = [], i = s;
+    while(i < e){
+      var tb = b[i++], cls = tb >> 6, cons = (tb >> 5) & 1, tag = tb & 31;
+      if(tag === 31){ tag = 0; var x; do{ x = b[i++]; tag = (tag << 7) | (x & 127); }while(x & 128); }
+      var l = b[i++];
+      if(l & 128){ var n = l & 127; l = 0; for(var k=0;k<n;k++) l = l*256 + b[i++]; }
+      var nd = { cls:cls, tag:tag, vs:i, ve:i+l };
+      if(cons) nd.ch = berLe(b, i, i+l);
+      out.push(nd); i += l;
+    }
+    return out;
+  }
+  function berInt(n, b){ var x = 0; for(var i=n.vs;i<n.ve;i++) x = x*256 + b[i]; return x; }
+  function buLe(b){
+    var env = berLe(b, 0, b.length)[0].ch;
+    var oct = env[4], pl = b.slice(oct.vs, oct.ve);
+    var r = berLe(pl, 0, pl.length)[0].ch;
+    var comp = null;
+    r.forEach(function(n){ if(comp===null && n.cls===0 && n.tag===2) comp = berInt(n, pl); });   // 1º inteiro = comparecimento
+    var eleicoes = r[r.length-2], aptos = 0, cargos = {};
+    eleicoes.ch.forEach(function(ele){
+      if(!aptos) aptos = berInt(ele.ch[1], pl);
+      ele.ch[4].ch.forEach(function(rv){ rv.ch[2].ch.forEach(function(tvc){
+        var cod = berInt(tvc.ch[0], pl), lista = [];
+        tvc.ch[2].ch.forEach(function(v){
+          var o = {};
+          v.ch.forEach(function(c){
+            if(c.cls!==2) return;
+            if(c.tag===1) o.t = berInt(c, pl);
+            else if(c.tag===2) o.q = berInt(c, pl);
+            else if(c.tag===3 && c.ch){ o.p = berInt(c.ch[0], pl); o.n = berInt(c.ch[1], pl); }
+          });
+          lista.push(o);
+        });
+        cargos[cod] = lista;
+      }); });
+    });
+    return { aptos:aptos, comp:comp||0, cargos:cargos };
+  }
+  // baixa o BU de uma seção; devolve null se o TSE ainda não recebeu
+  function buBaixa(sec){
+    return fetch(BU_BASE+sec+'/p003220-mg-m48950-z0194-s'+sec+'-aux.jws?nocache='+Date.now(), { cache:'no-store' })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(tx){
+        if(!tx) return null;
+        var j = liveDecode(tx), hs = (j.hashes||[]).filter(function(h){ return (h.arq||[]).some(function(a){ return a.tp==='bu'; }); });
+        if(!hs.length) return null;
+        var h = hs[hs.length-1], nm = h.arq.filter(function(a){ return a.tp==='bu'; })[0].nm;
+        return fetch(BU_BASE+sec+'/'+h.hash+'/'+nm, { cache:'no-store' })
+          .then(function(r){ return r.ok ? r.arrayBuffer() : null; })
+          .then(function(ab){ return ab ? buLe(new Uint8Array(ab)) : null; });
+      })
+      .catch(function(){ return null; });
+  }
+  // roda as tarefas com no máximo N em paralelo
+  function pool(itens, n, fn){
+    var i = 0;
+    return Promise.all(new Array(Math.min(n, itens.length)).fill(0).map(function(){
+      return (function prox(){ if(i >= itens.length) return Promise.resolve(); var it = itens[i++]; return fn(it).then(prox); })();
+    }));
+  }
+  function liveAplicaSecoes(p){
+    var cod = CARGO_COD[p.id];
+    var s2m = {}; (window.SECOES||[]).forEach(function(s){ if(s.micro && !/^A /.test(s.micro)) s2m[s.s] = s.micro; });
+    var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; c.votos = 0; });
+    var acc = {}, km = {}, T = { a:0, c:0, n:0, br:0, nu:0 }, nSec = 0;
+    Object.keys(secCache).forEach(function(sec){
+      var d = secCache[sec], vs = d.cargos[cod]; if(!vs) return;
+      nSec++;
+      var nom = 0, micro = s2m[sec];
+      vs.forEach(function(x){
+        if(x.t===1){ nom += x.q; var c = por[String(x.n)]; if(c){ c.votos += x.q; if(micro){ var k = c.nome+'\u0001'+micro; acc[k] = (acc[k]||0) + x.q; } } }
+        else if(x.t===2) T.br += x.q;
+        else if(x.t===3) T.nu += x.q;
+        else if(x.t===4){ var lg = por[String(x.p)]; if(lg){ lg.votos += x.q; } }
+      });
+      T.a += d.aptos; T.c += d.comp; T.n += nom;
+      if(micro){ var m = km[micro] || (km[micro] = { a:0, c:0, ab:0, n:0 }); m.a += d.aptos; m.c += d.comp; m.ab += d.aptos - d.comp; m.n += nom; }
+    });
+    p.cruzamento = Object.keys(acc).map(function(k){ var a = k.split('\u0001'); return { c:a[0], m:a[1], v:acc[k] }; });
+    Object.keys(p.kpis_micro||{}).forEach(function(m){ p.kpis_micro[m] = km[m] || { a:0, c:0, ab:0, n:0 }; });
+    Object.keys(km).forEach(function(m){ if(!p.kpis_micro[m]) p.kpis_micro[m] = km[m]; });
+    p.kpis = { aptos:T.a, comparecimento:T.c, abstencoes:T.a - T.c, nominais:T.n };
+    var tot = (window.SECOES||[]).length || 227;
+    p.live = { modo:'secoes', brancos:T.br, nulos:T.nu, secTot:tot, secApur:nSec, pApur:(100*nSec/tot).toFixed(2).replace('.',','),
+               hora:new Date().toLocaleTimeString('pt-BR') };
+    p.candidatos.sort(function(a,b){ return b.votos - a.votos; });
+    _metaCache = {};
+  }
   function liveAtualiza(){
     var p = pg(st.pageId);
     if(!p || !LIVE_CFG[p.id] || liveBusy) return;
     liveBusy = true; liveMsg = 'Consultando o TSE…'; livePinta();
-    fetch(liveUrl(p.id) + '?nocache=' + Date.now(), { cache:'no-store' })
-      .then(function(r){ if(!r.ok) throw new Error('TSE ainda não publicou (' + r.status + ')'); return r.text(); })
-      .then(function(t){ liveAplica(p, liveDecode(t)); liveMsg = ''; liveBusy = false; render(); })
+    var pend = (window.SECOES||[]).map(function(s){ return s.s; }).filter(function(s){ return !secCache[s]; });
+    var feitas = 0;
+    pool(pend, 12, function(sec){
+      return buBaixa(sec).then(function(d){ if(d) secCache[sec] = d; feitas++; liveMsg = 'Consultando o TSE… '+feitas+'/'+pend.length; livePinta(); });
+    }).then(function(){
+      // as urnas valem para todos os cargos: atualiza as 5 páginas de uma vez
+      if(Object.keys(secCache).length){ Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q) liveAplicaSecoes(q); }); return null; }
+      // nenhuma urna recebida ainda: mostra ao menos o total do município (arquivo da zona)
+      return fetch(liveUrl(p.id) + '?nocache=' + Date.now(), { cache:'no-store' })
+        .then(function(r){ if(!r.ok) throw new Error('TSE ainda não publicou ('+r.status+')'); return r.text(); })
+        .then(function(tx){ liveAplica(p, liveDecode(tx)); });
+    }).then(function(){ liveMsg = ''; liveBusy = false; render(); })
       .catch(function(e){ liveMsg = 'Não consegui atualizar: ' + e.message; liveBusy = false; livePinta(); });
   }
   function liveAutoLigaDesliga(){
@@ -580,13 +684,14 @@
   function liveBarraHtml(p){
     if(!LIVE_CFG[p.id]) return '';
     var L = p.live;
-    var info = L ? ('Apuração: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · dados do TSE de '+esc(L.hora))
+    var info = L ? (L.modo==='secoes' ? ('Urnas recebidas: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · atualizado às '+esc(L.hora))
+                              : ('Apuração: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · dados do TSE de '+esc(L.hora)))
                  : 'Ainda não atualizado nesta sessão — clique em “Atualizar do TSE”.';
     return '<div class="escopo-nota" id="liveBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
       '<button class="btn btn-verde" id="btLive">🔄 Atualizar do TSE</button>'+
       '<label style="font-size:12.5px"><input type="checkbox" id="chLive"'+(liveAuto?' checked':'')+'> atualizar sozinho a cada 1 min</label>'+
       '<span id="liveInfo">'+info+'</span><span class="mr" id="liveMsg">'+esc(liveMsg)+'</span></div>'+
-      (L ? '<div class="escopo-nota">Totais do <b>município inteiro</b> ao vivo pelo TSE. Os gráficos por região e bairro serão preenchidos quando as votações por seção forem importadas.</div>' : '');
+      (L ? (L.modo==='secoes' ? '<div class="escopo-nota">Soma das <b>urnas já recebidas</b> pelo TSE, seção por seção. Região e bairro seguem o cadastro de <b>Seções 2026</b>.</div>' : '<div class="escopo-nota">Totais do <b>município inteiro</b> ao vivo pelo TSE. Nenhuma urna de Nova Lima foi recebida ainda — o detalhe por região aparece quando chegarem.</div>') : '');
   }
   function livePinta(){
     var m = document.getElementById('liveMsg'); if(m) m.textContent = liveMsg;
