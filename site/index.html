@@ -683,6 +683,30 @@
     }).then(function(){ liveMsg = ''; liveBusy = false; render(); })
       .catch(function(e){ liveMsg = 'Não consegui atualizar: ' + e.message; liveBusy = false; livePinta(); });
   }
+  // Abre já com a última apuração que o servidor guardou (site/apuracao.json, atualizado de 5 em 5 min
+  // por _vps/atualizar_apuracao.py) — assim ninguém entra com tudo zerado.
+  var apuracaoTimer = null, apuracaoN = -1;
+  function carregaApuracao(){
+    fetch('apuracao.json?_=' + Date.now(), { cache:'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if(!j || !j.secoes) return;
+        Object.keys(j.secoes).forEach(function(sec){
+          if(secCache[sec]) return;
+          var d = j.secoes[sec], cg = {};
+          Object.keys(d.cargos).forEach(function(c){ cg[c] = d.cargos[c].map(function(a){ return { t:a[0], q:a[1], p:a[2], n:a[3] }; }); });
+          secCache[sec] = { aptos:d.aptos, comp:d.comp, cargos:cg };
+        });
+        var n = Object.keys(secCache).length;
+        if(!n || n === apuracaoN) return;
+        apuracaoN = n;
+        Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q) liveAplicaSecoes(q); });
+        var h = j.gerado_ts ? new Date(j.gerado_ts * 1000).toLocaleTimeString('pt-BR') : '';
+        Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q && q.live && h) q.live.hora = h + ' (servidor)'; });
+        if(LIVE_CFG[st.pageId] || st.rota === 'pagina') render();
+      }).catch(function(){});
+    if(!apuracaoTimer) apuracaoTimer = setInterval(carregaApuracao, 300000);
+  }
   function liveAutoLigaDesliga(){
     if(liveTimer){ clearInterval(liveTimer); liveTimer = null; }
     var p = pg(st.pageId);
@@ -1493,6 +1517,7 @@
     ultimoToque = 0; armarInatividade();
     registrarEvento('login', usuario);
     render();
+    carregaApuracao();
   }
 
   (function(){

@@ -1,0 +1,18 @@
+APURACAO 2026 AUTOMATICA (VPS)
+==============================
+O script _vps/atualizar_apuracao.py le os Boletins de Urna do TSE (Nova Lima, Zona 194)
+e grava site/apuracao.json. O painel abre ja com esse resultado, para todo mundo,
+sem ninguem precisar clicar em "Atualizar do TSE".
+
+Ativar (uma vez, na VPS):
+
+  cd /srv/painel-eleicoes && git pull
+  python3 _vps/atualizar_apuracao.py
+  (crontab -l 2>/dev/null | grep -v atualizar_apuracao; echo "*/5 * * * * cd /srv/painel-eleicoes && /usr/bin/python3 _vps/atualizar_apuracao.py >> /var/log/apuracao.log 2>&1") | crontab -
+
+- O 1o comando traz as urnas ja recebidas (leva ~30 s).
+- O cron roda de 5 em 5 minutos; cada rodada baixa so as urnas novas.
+- Ver o que ele fez:   tail -5 /var/log/apuracao.log
+- Parar:               crontab -l | grep -v atualizar_apuracao | crontab -
+- site/apuracao.json nao vai pro git (esta no .gitignore): nao some com o git pull.
+- Nao precisa mexer no Caddy.
