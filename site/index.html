@@ -898,7 +898,6 @@
         '<div><h1>'+p.titulo+'</h1><div class="sub">'+(D.municipio||'Nova Lima / MG')+
           ' · Fonte TRE-MG'+(p.tem_partido?' · '+p.candidatos.length+' candidatos':'')+
           ' &nbsp;•&nbsp; <b>'+escopo+'</b></div></div>'+
-        (LIVE_CFG[p.id] ? '<div class="aviso-boletim">Os boletins de urna entram no sistema um pouco atrasados, por isso há essa diferença entre macro e microrregiões.</div>' : '')+
         '<button class="btn btn-limpar'+(temAlgumFiltro()?' on':'')+'" id="btLimpar">'+
           (temAlgumFiltro()?'✕ Limpar seleção':'Sem filtros')+'</button>'+
       '</div>'+
