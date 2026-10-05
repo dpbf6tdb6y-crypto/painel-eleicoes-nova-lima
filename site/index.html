@@ -828,32 +828,19 @@
     var p = pg(st.pageId);
     if(liveAuto && st.rota==='pagina' && p && LIVE_CFG[p.id]) liveTimer = setInterval(liveAtualiza, 300000);
   }
-  function liveBarraHtml(p){
-    if(!LIVE_CFG[p.id]) return '';
-    var L = p.live, info, nota = '';
-    if(!L){
-      info = 'Ainda sem apuração — clique em “Atualizar do TSE”.';
-    } else if(L.modo === 'zona'){
-      info = 'Apuração do TSE: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · TSE às '+esc((L.hora||'').split(' ')[1]||L.hora)+
-             (L.servidor ? ' · servidor às '+esc(L.servidor) : '');
-      nota = 'Totais do <b>município</b> pela apuração oficial do TSE. Região e bairro somam só as <b>'+L.nbu+'</b> urnas cujo boletim o TSE já liberou — por isso os totais por região são menores.';
-    } else {
-      info = 'Urnas recebidas: <b>'+L.secApur+'</b> de <b>'+L.secTot+'</b> seções ('+L.pApur+'%) · atualizado às '+esc(L.servidor || L.hora);
-      nota = 'Soma das <b>urnas já recebidas</b> pelo TSE, seção por seção. Região e bairro seguem o cadastro de <b>Seções 2026</b>.';
-    }
-    return '<div class="escopo-nota" id="liveBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
-      '<label style="font-size:12.5px"><input type="checkbox" id="chLive"'+(liveAuto?' checked':'')+'> atualizar sozinho a cada 5 min</label>'+
-      '<span id="liveInfo">'+info+'</span><span class="mr" id="liveMsg">'+esc(liveMsg)+'</span></div>'+
-      (nota ? '<div class="escopo-nota">'+nota+'</div>' : '');
-  }
+  // As faixas verdes com o status da apuração foram retiradas da tela (05/10/2026).
+  // O botão "Atualizar do TSE" fica no topo e mostra o andamento no próprio texto.
+  function liveBarraHtml(p){ return ''; }
   function livePinta(){
     var m = document.getElementById('liveMsg'); if(m) m.textContent = liveMsg;
-    var b = document.getElementById('btLive'); if(b) b.disabled = liveBusy;
+    var b = document.getElementById('btLive');
+    if(b){ b.disabled = liveBusy; b.textContent = liveBusy ? '⏳ '+(liveMsg || 'Atualizando…') : (liveMsg ? '⚠️ '+liveMsg : '🔄 Atualizar do TSE'); }
   }
   function liveLiga(v){
     var b = document.getElementById('btLive'); if(!b) { liveAutoLigaDesliga(); return; }
     b.onclick = liveAtualiza;
-    document.getElementById('chLive').onchange = function(){ liveAuto = this.checked; liveAutoLigaDesliga(); if(liveAuto) liveAtualiza(); };
+    var ch = document.getElementById('chLive');
+    if(ch) ch.onchange = function(){ liveAuto = this.checked; liveAutoLigaDesliga(); if(liveAuto) liveAtualiza(); };
     liveAutoLigaDesliga();
   }
 
