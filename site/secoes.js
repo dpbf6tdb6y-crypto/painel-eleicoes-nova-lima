@@ -66,10 +66,10 @@ window.SECOES = [
  },
  {
   "s": "0013",
-  "loc": "A CONFIRMAR",
+  "loc": "EMÍLIA DE LIMA",
   "end": "A CONFIRMAR",
-  "macro": "A DEFINIR",
-  "micro": "A DEFINIR"
+  "macro": "Centro",
+  "micro": "Rua Nova"
  },
  {
   "s": "0014",
@@ -1557,37 +1557,37 @@ window.SECOES = [
  },
  {
   "s": "0310",
-  "loc": "A CONFIRMAR",
-  "end": "A CONFIRMAR",
-  "macro": "A DEFINIR",
-  "micro": "A DEFINIR"
+  "loc": "COLEGIO SANTO AGOSTINHO",
+  "end": "Rua das Cores, 355",
+  "macro": "Cond. MG 030",
+  "micro": "Va. dos Cristais"
  },
  {
   "s": "0312",
-  "loc": "A CONFIRMAR",
+  "loc": "COLEGIO BATISTA",
   "end": "A CONFIRMAR",
-  "macro": "A DEFINIR",
-  "micro": "A DEFINIR"
+  "macro": "Cond. BR 356",
+  "micro": "Alphaville"
  },
  {
   "s": "0313",
-  "loc": "A CONFIRMAR",
+  "loc": "MILTON CAMPOS",
   "end": "A CONFIRMAR",
-  "macro": "A DEFINIR",
-  "micro": "A DEFINIR"
+  "macro": "Vila da Serra",
+  "micro": "Vila da Serra"
  },
  {
   "s": "0314",
-  "loc": "A CONFIRMAR",
+  "loc": "COLEGIO SANTO AGOSTINHO",
   "end": "A CONFIRMAR",
-  "macro": "A DEFINIR",
-  "micro": "A DEFINIR"
+  "macro": "Cond. MG 030",
+  "micro": "Va. dos Cristais"
  },
  {
   "s": "0315",
-  "loc": "A CONFIRMAR",
+  "loc": "COLEGIO BATISTA",
   "end": "A CONFIRMAR",
-  "macro": "A DEFINIR",
-  "micro": "A DEFINIR"
+  "macro": "Cond. BR 356",
+  "micro": "Alphaville"
  }
 ];
