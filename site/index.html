@@ -75,6 +75,9 @@
 
   .kpis{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-bottom:12px}
   @media(max-width:900px){.kpis{grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px}}
+  .kpis-tit{font-size:12px;font-weight:600;color:var(--suave);margin:2px 0 6px}
+  .kpis-tit span{font-weight:400}
+  @media(min-width:901px){.kpis.kpis-s5{grid-template-columns:repeat(5,minmax(0,1fr))}}
   .escopo-nota{background:#eef6ee;border:1px solid #cfe6cf;color:#2f7d32;border-radius:8px;
     padding:8px 12px;font-size:12.5px;margin-bottom:16px}
   .escopo-nota code{background:#dcefdc;padding:1px 4px;border-radius:3px}
@@ -882,16 +885,34 @@
       '</div>'+
       liveBarraHtml(p)+
       (temFV ? barraFiltrosVereador(p) : '')+
-      '<div class="kpis">'+
-        kpi('Aptos'+rotArea, k.aptos, false, 'aptos')+
-        kpi('Comparecimento'+rotArea, k.comparecimento, false, 'comparecimento')+
-        kpi('Abstenções'+rotArea, k.abstencoes, false, 'abstencoes')+
-        kpi('Votos nominais'+rotArea, k.nominais, false, 'nominais')+
-        kpi('Brancos'+rotArea, brancos, false, 'brancos')+
-        kpi('Nulos'+rotArea, nulos, false, 'nulos')+
-        kpi('% Comparecimento', perc.toFixed(1).replace('.',',')+'%', true)+
-        '<div class="kpi destaque"><div class="rot">Votos na seleção</div><div class="val" id="kvSel">—</div></div>'+
-      '</div>'+
+      (p.id==='senador_2026'
+        /* Senador tem 2 votos por eleitor: separa "eleitores" de "votos" para os números não parecerem errados. */
+        ? '<div class="kpis-tit">Eleitores <span>(cada um conta uma vez)</span></div>'+
+          '<div class="kpis kpis-s5">'+
+            kpi('Aptos'+rotArea, k.aptos, false, 'aptos')+
+            kpi('Comparecimento'+rotArea, k.comparecimento, false, 'comparecimento')+
+            kpi('Abstenções'+rotArea, k.abstencoes, false, 'abstencoes')+
+            kpi('% Comparecimento', perc.toFixed(1).replace('.',',')+'%', true)+
+          '</div>'+
+          '<div class="kpis-tit">Votos do Senador <span>(2 votos por eleitor)</span></div>'+
+          '<div class="kpis kpis-s5">'+
+            kpi('Votos nominais'+rotArea, k.nominais, false, 'nominais')+
+            kpi('Brancos'+rotArea, brancos, false, 'brancos')+
+            kpi('Nulos'+rotArea, nulos, false, 'nulos')+
+            kpi('Total de votos', (k.nominais||0)+(brancos||0)+(nulos||0))+
+            '<div class="kpi destaque"><div class="rot">Votos na seleção</div><div class="val" id="kvSel">—</div></div>'+
+          '</div>'+
+          '<div class="escopo-nota" style="margin-top:-4px">No Senador cada eleitor vota duas vezes; por isso os votos passam do número de eleitores. Total de votos = nominais + brancos + nulos.</div>'
+        : '<div class="kpis">'+
+            kpi('Aptos'+rotArea, k.aptos, false, 'aptos')+
+            kpi('Comparecimento'+rotArea, k.comparecimento, false, 'comparecimento')+
+            kpi('Abstenções'+rotArea, k.abstencoes, false, 'abstencoes')+
+            kpi('Votos nominais'+rotArea, k.nominais, false, 'nominais')+
+            kpi('Brancos'+rotArea, brancos, false, 'brancos')+
+            kpi('Nulos'+rotArea, nulos, false, 'nulos')+
+            kpi('% Comparecimento', perc.toFixed(1).replace('.',',')+'%', true)+
+            '<div class="kpi destaque"><div class="rot">Votos na seleção</div><div class="val" id="kvSel">—</div></div>'+
+          '</div>')+
       (temAreaFiltro()?'<div class="escopo-nota">Somando <b>'+ areaTexto() +'</b>'+
         (st.selCand?(' · candidato <b>'+st.selCand+'</b>'):'')+
         '. Clique nas barras/linhas para incluir ou tirar; “Limpar seleção” zera tudo.</div>':'')+
