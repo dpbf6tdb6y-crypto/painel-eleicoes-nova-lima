@@ -267,7 +267,7 @@
   var fmt = new Intl.NumberFormat('pt-BR');
   var MACROS = D.macros_ordem;
   var m2M = D.micro_para_macro;
-  var CORES = {azul:'#2f5597', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
+  var CORES = {azul:'#2f5597', azulClaro:'#5aa9e6', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
 
   var st = { rota:'menu', pageId:null, selCand:null, selMacros:[], selMicros:[], selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
   var acessosEdit = null;    // cópia de trabalho da lista de usuários (tela Acessos)
@@ -987,6 +987,7 @@
         vis.map(function(c){ return c.nome + (c.partido?'  ('+c.partido+')':''); }),
         vis.map(function(c){ return c.votos; }),
         vis.map(function(c){ return c.nome===st.selCand?CORES.verde
+              : (c.nome==='Branco'||c.nome==='Nulo')?CORES.azulClaro
               : c.status==='Eleito'?CORES.verde
               : (c.status==='Suplente'||c.status==='Legenda')?CORES.cinza
               : CORES.azul; }),
