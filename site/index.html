@@ -1244,10 +1244,34 @@
     return chart;
   }
 
+  // Regiões e micro-regiões com a contagem de seções, sempre a partir do cadastro atual (Seções 2026).
+  // A lista fixa do dados.js (regioes_ref) serve só para a ordem de exibição e como reserva.
+  function regioesAtuais(){
+    var ref = D.regioes_ref||[], sec = window.SECOES||[];
+    if(!sec.length) return ref;
+    var por = {};
+    sec.forEach(function(x){
+      if(!x.macro || !x.micro) return;
+      var g = por[x.macro] || (por[x.macro] = {});
+      var e = g[x.micro] || (g[x.micro] = { n:0, loc:[] });
+      e.n++;
+      if(x.loc && !/^A (CONFIRMAR|DEFINIR)$/.test(x.loc) && e.loc.indexOf(x.loc)<0) e.loc.push(x.loc);
+    });
+    var ordemMacro = ref.map(function(g){ return g.macro; });
+    Object.keys(por).forEach(function(m){ if(ordemMacro.indexOf(m)<0) ordemMacro.push(m); });
+    return ordemMacro.filter(function(m){ return por[m]; }).map(function(m){
+      var ordemMicro = []; ref.forEach(function(g){ if(g.macro===m) g.micros.forEach(function(x){ ordemMicro.push(x.micro); }); });
+      Object.keys(por[m]).forEach(function(mi){ if(ordemMicro.indexOf(mi)<0) ordemMicro.push(mi); });
+      return { macro:m, micros: ordemMicro.filter(function(mi){ return por[m][mi]; }).map(function(mi){
+        return { micro:mi, secoes:por[m][mi].n, locais:por[m][mi].loc }; }) };
+    });
+  }
   function renderRegioes(v){
-    var ref = D.regioes_ref||[];
+    var ref = regioesAtuais();
+    var nMicros = ref.reduce(function(a,g){ return a+g.micros.length; }, 0);
+    var nSecoes = ref.reduce(function(a,g){ return a+g.micros.reduce(function(b,x){ return b+x.secoes; }, 0); }, 0);
     var h = '<div class="topo"><div><h1>Definição das Regiões de Nova Lima</h1>'+
-            '<div class="sub">'+MACROS.length+' regiões · '+Object.keys(m2M).length+' micro-regiões</div></div></div>'+
+            '<div class="sub">'+ref.length+' regiões · '+nMicros+' micro-regiões · '+nSecoes+' seções</div></div></div>'+
             '<div class="reg-grade">';
     ref.forEach(function(g){
       h += '<div class="reg-card"><h3>'+g.macro+'</h3><ul>';
