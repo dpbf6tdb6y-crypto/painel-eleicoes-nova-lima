@@ -693,7 +693,23 @@
       return (function prox(){ if(i >= itens.length) return Promise.resolve(); var it = itens[i++]; return fn(it).then(prox); })();
     }));
   }
+  /* Legenda, Branco e Nulo entram no ranking como linhas próprias nas páginas de 2026: assim o total do
+     ranking fecha com o comparecimento e dá para ver legenda/brancos/nulos por região e por bairro. */
+  function garanteEspeciais(p){
+    if(!LIVE_CFG[p.id] || p._esp) return;
+    p.candidatos.forEach(function(c){
+      if(/^dep_/.test(p.id) && c.num && String(c.num).length<=2){
+        if(!c.status) c.status = 'Legenda';
+        if(c.nome.indexOf('Legenda ')!==0) c.nome = 'Legenda ' + c.nome;
+      }
+    });
+    ['Branco','Nulo'].forEach(function(n){
+      if(!p.candidatos.some(function(c){ return c.nome===n; })) p.candidatos.push({ nome:n, votos:0, status:n });
+    });
+    p._esp = true; _metaCache = {};
+  }
   function liveAplicaSecoes(p){
+    garanteEspeciais(p);
     var cod = CARGO_COD[p.id];
     var s2m = {}; (window.SECOES||[]).forEach(function(s){ if(s.micro && !/^A /.test(s.micro)) s2m[s.s] = s.micro; });
     var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; c.votos = 0; });
@@ -704,13 +720,14 @@
       var nom = 0, micro = s2m[sec];
       vs.forEach(function(x){
         if(x.t===1){ nom += x.q; var c = por[String(x.n)]; if(c){ c.votos += x.q; if(micro){ var k = c.nome+'\u0001'+micro; acc[k] = (acc[k]||0) + x.q; } } }
-        else if(x.t===2) T.br += x.q;
-        else if(x.t===3) T.nu += x.q;
-        else if(x.t===4){ var lg = por[String(x.p)]; if(lg){ lg.votos += x.q; } }
+        else if(x.t===2){ T.br += x.q; if(micro){ var kb = 'Branco'+micro; acc[kb] = (acc[kb]||0) + x.q; } }
+        else if(x.t===3){ T.nu += x.q; if(micro){ var kn = 'Nulo'+micro; acc[kn] = (acc[kn]||0) + x.q; } }
+        else if(x.t===4){ var lg = por[String(x.p)]; if(lg){ lg.votos += x.q; if(micro){ var kl = lg.nome+''+micro; acc[kl] = (acc[kl]||0) + x.q; } } }
       });
       T.a += d.aptos; T.c += d.comp; T.n += nom;
       if(micro){ var m = km[micro] || (km[micro] = { a:0, c:0, ab:0, n:0 }); m.a += d.aptos; m.c += d.comp; m.ab += d.aptos - d.comp; m.n += nom; }
     });
+    p.candidatos.forEach(function(c){ if(c.nome==='Branco') c.votos = T.br; else if(c.nome==='Nulo') c.votos = T.nu; });
     p.cruzamento = Object.keys(acc).map(function(k){ var a = k.split('\u0001'); return { c:a[0], m:a[1], v:acc[k] }; });
     Object.keys(p.kpis_micro||{}).forEach(function(m){ p.kpis_micro[m] = km[m] || { a:0, c:0, ab:0, n:0 }; });
     Object.keys(km).forEach(function(m){ if(!p.kpis_micro[m]) p.kpis_micro[m] = km[m]; });
@@ -746,12 +763,14 @@
   }
   // junta as duas fontes: totais da zona (mais atuais) + região/bairro dos boletins já liberados
   function aplicaTudo(p){
+    garanteEspeciais(p);
     var cod = CARGO_COD[p.id], zc = zonaCache[cod], nbu = Object.keys(secCache).length;
     if(nbu) liveAplicaSecoes(p);
     if(zc && zc.secApur > nbu){
       var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; });
       Object.keys(zc.cand).forEach(function(n){ if(por[n]) por[n].votos = zc.cand[n]; });
       Object.keys(zc.leg).forEach(function(n){ if(!(n in zc.cand) && por[n]) por[n].votos = zc.leg[n]; });
+      p.candidatos.forEach(function(c){ if(c.nome==='Branco') c.votos = zc.br; else if(c.nome==='Nulo') c.votos = zc.nu; });
       p.candidatos.sort(function(a,b){ return b.votos - a.votos; });
       p.kpis = { aptos:zc.aptos, comparecimento:zc.comp, abstencoes:zc.abst, nominais:zc.nom };
       p.live = { modo:'zona', brancos:zc.br, nulos:zc.nu, secTot:zc.secTot, secApur:zc.secApur, pApur:zc.pApur,
