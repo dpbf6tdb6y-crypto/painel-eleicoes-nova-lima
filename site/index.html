@@ -1410,8 +1410,13 @@
         '</div>'+
       '</div>'+
       '<div class="painel painel-full">'+
+        '<h3>Quem está acessando agora <button class="btn btn-cinza" id="btOnline" style="margin-left:10px;padding:4px 10px;font-size:12px">🔄 Atualizar</button></h3>'+
+        '<div class="dica">Quem está com o painel aberto neste momento. Atualiza sozinho a cada 30 segundos.</div>'+
+        '<div id="onlineLista" class="mr" style="margin-top:8px">Carregando…</div>'+
+      '</div>'+
+      '<div class="painel painel-full">'+
         '<h3>Relatório de acessos</h3>'+
-        '<div class="dica">Quem entrou e saiu do painel, com data e hora. Atualiza sozinho a cada 5 minutos.</div>'+
+        '<div class="dica">Quem entrou e saiu do painel, com data e hora. Atualiza sozinho a cada minuto.</div>'+
         '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:8px 0 12px">'+
           '<div><label class="ac-lbl">De</label><input type="date" id="relDe" class="barra-busca" style="width:auto"></div>'+
           '<div><label class="ac-lbl">Até</label><input type="date" id="relAte" class="barra-busca" style="width:auto"></div>'+
@@ -1440,6 +1445,49 @@
       out += '\nTotal: ' + lista.length + ' evento(s)';
       return out;
     }
+    function carregaOnline(){
+      var box = document.getElementById('onlineLista'); if(!box) return;
+      fetch('acessos.json?_=' + Date.now(), { cache:'no-store' })
+        .then(function(r){
+          if(!r.ok) throw new Error('sem arquivo');
+          var lm = r.headers.get('Last-Modified');
+          return r.json().then(function(l){ return { lista:l, mod: lm ? new Date(lm).getTime() : null }; });
+        })
+        .then(function(x){
+          var agora = Date.now(), ult = {};
+          x.lista.forEach(function(e){ if(e.login && (!ult[e.login] || e.ts >= ult[e.login].ts)) ult[e.login] = e; });
+          var obsoleto = x.mod !== null && (agora - x.mod) > 6*60000;      // a VPS parou de atualizar o arquivo
+          var hh = function(ms){ var d = new Date(ms), hoje = new Date();
+            var h = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+            return d.toDateString()===hoje.toDateString() ? h : d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+h; };
+          var nomes = {}; listaUsuarios().forEach(function(u){ nomes[u.login] = u.nome || u.login; });
+          var logins = Object.keys(nomes); Object.keys(ult).forEach(function(l){ if(logins.indexOf(l)<0) logins.push(l); });
+          var linhas = logins.map(function(l){
+            var e = ult[l], ms = e ? e.ts*1000 : 0, st2, ordem;
+            if(!e){ st2 = '<span class="mr">nunca acessou</span>'; ordem = 3; }
+            else if(obsoleto){ st2 = '<span class="mr">último registro: '+hh(ms)+'</span>'; ordem = 2; }
+            else if(e.evento==='logout'){ st2 = '⚪ saiu às '+hh(ms); ordem = 2; }
+            else if(agora - ms <= 4*60000){ var m = Math.floor((agora-ms)/60000); st2 = '<b style="color:#2e7d32">🟢 online agora</b> <span class="mr">(atividade '+(m<1?'agora há pouco':'há '+m+' min')+')</span>'; ordem = 0; }
+            else { st2 = '⚪ sem sinal desde '+hh(ms)+' <span class="mr">(provavelmente fechou a aba)</span>'; ordem = 1; }
+            return { ordem:ordem, ms:ms, html:'<tr><td style="padding:5px 10px 5px 0"><b>'+esc(nomes[l]||l)+'</b> <span class="mr">('+esc(l)+')</span></td>'+
+              '<td style="padding:5px 10px">'+st2+'</td><td style="padding:5px 0" class="mr">'+esc(e?(e.ip||''):'')+'</td></tr>' };
+          }).sort(function(a,b){ return a.ordem-b.ordem || b.ms-a.ms; });
+          var on = linhas.filter(function(r){ return r.ordem===0; }).length;
+          box.innerHTML = '<div style="margin-bottom:6px"><b>'+on+'</b> online agora</div>'+
+            (obsoleto ? '<div class="escopo-nota" style="background:#fff4e5;border-color:#f3c98b;color:#8a5200">⚠️ O relatório foi atualizado pela última vez às <b>'+hh(x.mod)+'</b>. Sem dados novos, não dá para saber quem está online — confira a tarefa agendada na VPS.</div>' : '')+
+            '<table style="border-collapse:collapse;font-size:13px">'+linhas.map(function(r){ return r.html; }).join('')+'</table>'+
+            '<div class="mr" style="margin-top:8px">Dados da VPS'+(x.mod!==null?' às '+new Date(x.mod).toLocaleTimeString('pt-BR'):'')+'. Online = atividade nos últimos 4 minutos e sem ter saído.</div>';
+        })
+        .catch(function(){ box.textContent = 'Ainda não há dados de acesso. Configure o log na VPS (arquivo _vps/COMO_ATIVAR_LOG.txt).'; });
+    }
+    document.getElementById('btOnline').onclick = carregaOnline;
+    carregaOnline();
+    if(window._onlineTimer) clearInterval(window._onlineTimer);
+    window._onlineTimer = setInterval(function(){
+      if(!document.getElementById('onlineLista')){ clearInterval(window._onlineTimer); return; }
+      carregaOnline();
+    }, 30000);
+
     document.getElementById('btRelatorio').onclick = function(){
       var de = document.getElementById('relDe').value;
       var ate = document.getElementById('relAte').value;
@@ -1447,14 +1495,15 @@
       status.textContent = 'Carregando…'; saida.textContent = '';
       fetch('acessos.json?_=' + Date.now(), { cache:'no-store' })
         .then(function(r){ if(!r.ok) throw new Error('sem arquivo'); return r.json(); })
-        .then(function(lista){
+        .then(function(todos){
+          var lista = todos.filter(function(x){ return x.evento!=='ping'; });   // sinal de vida não entra na lista
           var deTs  = de  ? new Date(de + 'T00:00:00').getTime()  : -Infinity;
           var ateTs = ate ? new Date(ate + 'T23:59:59').getTime() :  Infinity;
           var filt = lista.filter(function(x){ var t = x.ts*1000; return t>=deTs && t<=ateTs; });
           filt.sort(function(a,b){ return a.ts-b.ts; });
           saida.textContent = montaRelatorio(filt);
           // "Atualizado agora" enganava: o arquivo é refeito pela VPS de tempos em tempos. Mostra o último acesso que ele já tem.
-          var ult = lista.reduce(function(m,x){ return x.ts>m ? x.ts : m; }, 0);
+          var ult = todos.reduce(function(m,x){ return x.ts>m ? x.ts : m; }, 0);
           status.textContent = filt.length + ' evento(s) · último acesso registrado: ' +
             (ult ? new Date(ult*1000).toLocaleString('pt-BR') : '—');
         })
@@ -1751,6 +1800,9 @@
     document.getElementById('app').hidden = false;
     ultimoToque = 0; armarInatividade();
     registrarEvento('login', usuario);
+    // sinal de vida a cada 2 min com o painel aberto e visível: é daí que a tela Acessos sabe quem está online agora
+    if(window._pingTimer) clearInterval(window._pingTimer);
+    window._pingTimer = setInterval(function(){ if(document.visibilityState==='visible') registrarEvento('ping'); }, 120000);
     render();
     carregaApuracao();
   }
