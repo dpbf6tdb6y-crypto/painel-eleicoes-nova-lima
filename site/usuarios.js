@@ -23,11 +23,6 @@ window.USUARIOS = [
     "h": "d35cf283"
   },
   {
-    "nome": "JM",
-    "login": "jm",
-    "h": "a122058c"
-  },
-  {
     "nome": "Cissa",
     "login": "cissa",
     "h": "fc8ebacb"
