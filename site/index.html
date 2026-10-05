@@ -66,6 +66,18 @@
   .topo h1{font-size:20px;margin:0}
   .topo .sub{color:var(--suave);font-size:12.5px;margin-top:2px}
   .topo-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  /* Rel. Seções */
+  .rel-base{display:inline-block;background:#e8f0fb;color:var(--azul);font-weight:700;font-size:12.5px;border-radius:6px;padding:3px 9px;margin-top:6px}
+  .rel-wrap{background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(20,40,80,.07);overflow-x:auto}
+  .rel-tab{width:100%;border-collapse:collapse;font-size:12.5px;min-width:860px}
+  .rel-tab th{position:sticky;top:0;background:#1f3a5f;color:#fff;text-align:left;font-weight:600;padding:8px 10px;white-space:nowrap;z-index:1}
+  .rel-tab th.num,.rel-tab td.num{text-align:right}
+  .rel-tab td{padding:6px 10px;border-bottom:1px solid #d9e1ec}
+  .rel-tab .seta{cursor:pointer;opacity:.45;font-size:9px;margin-left:3px;user-select:none}
+  .rel-tab .seta:first-of-type{margin-left:6px}
+  .rel-tab .seta:hover{opacity:1}
+  .rel-tab .seta.on{opacity:1;color:#ffd35c}
+  .rel-tab tfoot td{font-weight:700;background:#d9e1ec;border-top:2px solid #b8c4d6}
   .btn{border:0;border-radius:7px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600}
   .btn-verde{background:var(--verde);color:#fff}
   .btn-cinza{background:#dde3ec;color:#33404f}
@@ -320,6 +332,9 @@
         h += '<a data-page="'+p.id+'" class="'+(st.pageId===p.id&&st.rota==='pagina'?'ativo':'')+'">'+ p.titulo +
           (p.pendente ? ' <span class="mr" style="font-size:10px">(em breve)</span>' : '') + '</a>';
       });
+      if(label==='Eleições 2026'){
+        h += '<a data-rota="relsecoes" class="'+(st.rota==='relsecoes'?'ativo':'')+'">Rel. Seções</a>';
+      }
       h += '</div>';
     });
     h += '<div class="nav-sec">Apoio</div><a data-rota="regioes" class="'+(st.rota==='regioes'?'ativo':'')+'">Definição das Regiões</a>'+
@@ -535,6 +550,7 @@
     if(st.rota==='regioes') return renderRegioes(v);
     if(st.rota==='acessos') return renderAcessos(v);
     if(st.rota==='secoes') return renderSecoes(v);
+    if(st.rota==='relsecoes') return renderRelSecoes(v);
     if(st.rota==='pagina') return renderPagina(v, pg(st.pageId));
     return renderMenu(v);
   }
@@ -821,7 +837,7 @@
         liveAplicaTodas();
         var h = j.gerado_ts ? new Date(j.gerado_ts * 1000).toLocaleTimeString('pt-BR') : '';
         Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q && q.live && h) q.live.servidor = h; });
-        if(st.rota === 'pagina') render();
+        if(st.rota === 'pagina' || st.rota === 'relsecoes') render();
       }).catch(function(){});
     if(!apuracaoTimer) apuracaoTimer = setInterval(carregaApuracao, 300000);
   }
@@ -1244,6 +1260,71 @@
     });
     h += '</div>';
     v.innerHTML = h;
+  }
+
+  /* ---------------- Rel. Seções (Deputado Estadual 2026, por seção) ---------------- */
+  var relOrd = { col:'secao', dir:1 };
+  var REL_COLS = [
+    { c:'secao', rot:'Seção', txt:true },
+    { c:'loc',   rot:'Local de votação', txt:true },
+    { c:'macro', rot:'Macro região', txt:true },
+    { c:'micro', rot:'Região', txt:true },
+    { c:'aptos', rot:'Aptos' }, { c:'comp', rot:'Comparecimento' }, { c:'abst', rot:'Abstenções' },
+    { c:'br', rot:'Brancos' }, { c:'nu', rot:'Nulos' }
+  ];
+  function relLinhas(){
+    var cod = CARGO_COD.dep_estadual_2026;
+    return (window.SECOES||[]).map(function(x){
+      var d = secCache[x.s], r = { secao:x.s, loc:x.loc||'', macro:x.macro||'', micro:x.micro||'', aptos:null, comp:null, abst:null, br:null, nu:null };
+      if(d && d.cargos[cod]){
+        r.aptos = d.aptos; r.comp = d.comp; r.abst = d.aptos - d.comp;
+        r.br = 0; r.nu = 0;
+        d.cargos[cod].forEach(function(a){ if(a.t===2) r.br += a.q; else if(a.t===3) r.nu += a.q; });
+      }
+      return r;
+    });
+  }
+  function renderRelSecoes(v){
+    var linhas = relLinhas();
+    var com = linhas.filter(function(r){ return r.aptos!==null; });
+    var head = '<div class="topo"><div><h1>Rel. Seções</h1>'+
+      '<div class="sub">'+(D.municipio||'Nova Lima / MG')+' · Eleições 2026 · 1º turno · '+linhas.length+' seções · Fonte: boletim de urna (TSE)</div>'+
+      '<div class="rel-base">Base: Votação de deputado estadual</div></div></div>';
+    if(!com.length){
+      v.innerHTML = head + '<div class="escopo-nota">Carregando a apuração… se demorar, abra a página <b>Deputado Estadual (2026)</b> e clique em “Atualizar do TSE”.</div>';
+      carregaApuracao();
+      return;
+    }
+    var t = { aptos:0, comp:0, abst:0, br:0, nu:0 };
+    com.forEach(function(r){ t.aptos+=r.aptos; t.comp+=r.comp; t.abst+=r.abst; t.br+=r.br; t.nu+=r.nu; });
+    var col = REL_COLS.filter(function(x){ return x.c===relOrd.col; })[0];
+    linhas.sort(function(a,b){
+      var x=a[relOrd.col], y=b[relOrd.col];
+      if(x===null && y===null) return 0; if(x===null) return 1; if(y===null) return -1;   // sem boletim: sempre no fim
+      var r = col.txt ? String(x).localeCompare(String(y),'pt',{numeric:true}) : (x-y);
+      return r*relOrd.dir || a.secao.localeCompare(b.secao);
+    });
+    var idxMacro = {}; MACROS.forEach(function(m,i){ idxMacro[m]=i; });
+    var h = head + (com.length<linhas.length ? '<div class="escopo-nota">'+(linhas.length-com.length)+' seção(ões) ainda sem boletim — aparecem com “—”.</div>' : '')+
+      '<div class="rel-wrap"><table class="rel-tab"><thead><tr>';
+    REL_COLS.forEach(function(c){
+      h += '<th class="'+(c.txt?'':'num')+'">'+c.rot+
+        '<span class="seta'+(relOrd.col===c.c&&relOrd.dir===1?' on':'')+'" data-c="'+c.c+'" data-d="1" title="Ordem crescente">▲</span>'+
+        '<span class="seta'+(relOrd.col===c.c&&relOrd.dir===-1?' on':'')+'" data-c="'+c.c+'" data-d="-1" title="Ordem decrescente">▼</span></th>';
+    });
+    h += '</tr></thead><tbody>';
+    linhas.forEach(function(r){
+      var i = idxMacro[r.macro]; var bg = (i===undefined || i%2===0) ? '#dce9f8' : '#fff0c9';   // 2 cores claras, por macro região
+      var f = function(n){ return n===null ? '—' : fmt.format(n); };
+      h += '<tr style="background:'+bg+'"><td>'+esc(r.secao)+'</td><td>'+esc(r.loc)+'</td><td>'+esc(r.macro)+'</td><td>'+esc(r.micro)+'</td>'+
+        '<td class="num">'+f(r.aptos)+'</td><td class="num">'+f(r.comp)+'</td><td class="num">'+f(r.abst)+'</td><td class="num">'+f(r.br)+'</td><td class="num">'+f(r.nu)+'</td></tr>';
+    });
+    h += '</tbody><tfoot><tr><td colspan="4">TOTAL ('+com.length+' seções)</td><td class="num">'+fmt.format(t.aptos)+'</td><td class="num">'+fmt.format(t.comp)+
+      '</td><td class="num">'+fmt.format(t.abst)+'</td><td class="num">'+fmt.format(t.br)+'</td><td class="num">'+fmt.format(t.nu)+'</td></tr></tfoot></table></div>';
+    v.innerHTML = h;
+    v.querySelectorAll('.rel-tab .seta').forEach(function(el){
+      el.onclick = function(){ relOrd = { col:el.dataset.c, dir:+el.dataset.d }; renderRelSecoes(v); };
+    });
   }
 
   function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
