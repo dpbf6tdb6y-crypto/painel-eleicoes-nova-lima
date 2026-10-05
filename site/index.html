@@ -1411,7 +1411,7 @@
       '</div>'+
       '<div class="painel painel-full">'+
         '<h3>Relatório de acessos</h3>'+
-        '<div class="dica">Quem entrou e saiu do painel, com data e hora. Atualiza sozinho uma vez por dia.</div>'+
+        '<div class="dica">Quem entrou e saiu do painel, com data e hora. Atualiza sozinho a cada 5 minutos.</div>'+
         '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:8px 0 12px">'+
           '<div><label class="ac-lbl">De</label><input type="date" id="relDe" class="barra-busca" style="width:auto"></div>'+
           '<div><label class="ac-lbl">Até</label><input type="date" id="relAte" class="barra-busca" style="width:auto"></div>'+
@@ -1453,7 +1453,10 @@
           var filt = lista.filter(function(x){ var t = x.ts*1000; return t>=deTs && t<=ateTs; });
           filt.sort(function(a,b){ return a.ts-b.ts; });
           saida.textContent = montaRelatorio(filt);
-          status.textContent = 'Atualizado agora · ' + filt.length + ' evento(s)';
+          // "Atualizado agora" enganava: o arquivo é refeito pela VPS de tempos em tempos. Mostra o último acesso que ele já tem.
+          var ult = lista.reduce(function(m,x){ return x.ts>m ? x.ts : m; }, 0);
+          status.textContent = filt.length + ' evento(s) · último acesso registrado: ' +
+            (ult ? new Date(ult*1000).toLocaleString('pt-BR') : '—');
         })
         .catch(function(){
           saida.textContent = 'Ainda não há relatório disponível.\nConfigure o log na VPS (arquivo _vps/COMO_ATIVAR_LOG.txt) — depois disso ele fica pronto sozinho.';
