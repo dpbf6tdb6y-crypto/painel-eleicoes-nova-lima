@@ -1263,7 +1263,7 @@
   }
 
   /* ---------------- Rel. Seções (Deputado Estadual 2026, por seção) ---------------- */
-  var relOrd = { col:'secao', dir:1 };
+  var relOrd = { col:'', dir:1 };   // col vazia = nenhuma seta marcada (ordem natural, por seção)
   var REL_COLS = [
     { c:'secao', rot:'Seção', txt:true },
     { c:'loc',   rot:'Local de votação', txt:true },
@@ -1289,7 +1289,8 @@
     var com = linhas.filter(function(r){ return r.aptos!==null; });
     var head = '<div class="topo"><div><h1>Rel. Seções</h1>'+
       '<div class="sub">'+(D.municipio||'Nova Lima / MG')+' · Eleições 2026 · 1º turno · '+linhas.length+' seções · Fonte: boletim de urna (TSE)</div>'+
-      '<div class="rel-base">Base: Votação de deputado estadual - ano 2026</div></div></div>';
+      '<div class="rel-base">Base: Votação de deputado estadual - ano 2026</div></div>'+
+      '<div class="topo-btns"><button class="btn btn-limpar'+(relOrd.col?' on':'')+'" id="btRelLimpar">'+(relOrd.col?'✕ Limpar ordenação':'Sem ordenação')+'</button></div></div>';
     if(!com.length){
       v.innerHTML = head + '<div class="escopo-nota">Carregando a apuração… se demorar, abra a página <b>Deputado Estadual (2026)</b> e clique em “Atualizar do TSE”.</div>';
       carregaApuracao();
@@ -1297,9 +1298,10 @@
     }
     var t = { aptos:0, comp:0, abst:0, br:0, nu:0 };
     com.forEach(function(r){ t.aptos+=r.aptos; t.comp+=r.comp; t.abst+=r.abst; t.br+=r.br; t.nu+=r.nu; });
-    var col = REL_COLS.filter(function(x){ return x.c===relOrd.col; })[0];
+    var col = REL_COLS.filter(function(x){ return x.c===(relOrd.col||'secao'); })[0];
+    var colOrd = relOrd.col || 'secao';
     linhas.sort(function(a,b){
-      var x=a[relOrd.col], y=b[relOrd.col];
+      var x=a[colOrd], y=b[colOrd];
       if(x===null && y===null) return 0; if(x===null) return 1; if(y===null) return -1;   // sem boletim: sempre no fim
       var r = col.txt ? String(x).localeCompare(String(y),'pt',{numeric:true}) : (x-y);
       return r*relOrd.dir || a.secao.localeCompare(b.secao);
@@ -1322,8 +1324,13 @@
       '</td><td class="num">'+fmt.format(t.abst)+'</td><td class="num">'+fmt.format(t.br)+'</td><td class="num">'+fmt.format(t.nu)+'</td></tr></tfoot></table></div>';
     v.innerHTML = h;
     v.querySelectorAll('.rel-tab .seta').forEach(function(el){
-      el.onclick = function(){ relOrd = { col:el.dataset.c, dir:+el.dataset.d }; renderRelSecoes(v); };
+      el.onclick = function(){
+        var igual = relOrd.col===el.dataset.c && relOrd.dir===+el.dataset.d;   // clicar de novo na seta marcada desmarca
+        relOrd = igual ? { col:'', dir:1 } : { col:el.dataset.c, dir:+el.dataset.d };
+        renderRelSecoes(v);
+      };
     });
+    document.getElementById('btRelLimpar').onclick = function(){ relOrd = { col:'', dir:1 }; renderRelSecoes(v); };
   }
 
   function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
