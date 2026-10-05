@@ -1289,7 +1289,7 @@
     var com = linhas.filter(function(r){ return r.aptos!==null; });
     var head = '<div class="topo"><div><h1>Rel. Seções</h1>'+
       '<div class="sub">'+(D.municipio||'Nova Lima / MG')+' · Eleições 2026 · 1º turno · '+linhas.length+' seções · Fonte: boletim de urna (TSE)</div>'+
-      '<div class="rel-base">Base: Votação de deputado estadual</div></div></div>';
+      '<div class="rel-base">Base: Votação de deputado estadual - ano 2026</div></div></div>';
     if(!com.length){
       v.innerHTML = head + '<div class="escopo-nota">Carregando a apuração… se demorar, abra a página <b>Deputado Estadual (2026)</b> e clique em “Atualizar do TSE”.</div>';
       carregaApuracao();
@@ -1304,7 +1304,6 @@
       var r = col.txt ? String(x).localeCompare(String(y),'pt',{numeric:true}) : (x-y);
       return r*relOrd.dir || a.secao.localeCompare(b.secao);
     });
-    var idxMacro = {}; MACROS.forEach(function(m,i){ idxMacro[m]=i; });
     var h = head + (com.length<linhas.length ? '<div class="escopo-nota">'+(linhas.length-com.length)+' seção(ões) ainda sem boletim — aparecem com “—”.</div>' : '')+
       '<div class="rel-wrap"><table class="rel-tab"><thead><tr>';
     REL_COLS.forEach(function(c){
@@ -1314,7 +1313,7 @@
     });
     h += '</tr></thead><tbody>';
     linhas.forEach(function(r){
-      var i = idxMacro[r.macro]; var bg = (i===undefined || i%2===0) ? '#dce9f8' : '#fff0c9';   // 2 cores claras, por macro região
+      var bg = '#dce9f8';   // todas as linhas na mesma cor (ao ordenar, cores alternadas se misturavam)
       var f = function(n){ return n===null ? '—' : fmt.format(n); };
       h += '<tr style="background:'+bg+'"><td>'+esc(r.secao)+'</td><td>'+esc(r.loc)+'</td><td>'+esc(r.macro)+'</td><td>'+esc(r.micro)+'</td>'+
         '<td class="num">'+f(r.aptos)+'</td><td class="num">'+f(r.comp)+'</td><td class="num">'+f(r.abst)+'</td><td class="num">'+f(r.br)+'</td><td class="num">'+f(r.nu)+'</td></tr>';
