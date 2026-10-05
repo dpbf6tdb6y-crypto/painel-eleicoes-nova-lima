@@ -148,6 +148,9 @@
   .scrollbox{max-height:440px;overflow-y:auto;overflow-x:hidden}
   /* quadro de bairros: mais alto (cabe quase tudo na tela), com titulo e total sempre visiveis */
   .scrollbox.alto{max-height:max(600px,calc(100vh - 150px))}
+  /* ranking e bairros: mesma altura, alinhados em cima e embaixo */
+  .grade > #pnEsq,.grade > #pnDir{align-self:stretch;display:flex;flex-direction:column}
+  .grade > #pnEsq .scrollbox,.grade > #pnDir .scrollbox{flex:1 1 auto;min-height:0}
   .scrollbox.alto thead th{position:sticky;top:0;background:var(--card);z-index:1}
   .scrollbox.alto tfoot td{position:sticky;bottom:0;background:var(--card)}
   .barra-busca{width:100%;padding:7px 10px;border:1px solid var(--linha);border-radius:7px;
@@ -1003,7 +1006,7 @@
         '<input class="barra-busca" id="busca" placeholder="Buscar candidato ou partido…" value="'+escAttr(st.busca)+'">'+
         (cands.length>22 ? '<div style="margin:2px 0 8px"><a style="cursor:pointer;color:#2f5597;font-weight:600" id="verTudo">'+
             (st.tudo?'▲ Ver menos':'▼ Ver todos os '+cands.length)+'</a></div>' : '')+
-        '<div class="scrollbox"><div class="chart-wrap" style="height:'+alturaGrafico(vis.length)+'px"><canvas id="cChart"></canvas></div></div>';
+        '<div class="scrollbox alto"><div class="chart-wrap" style="height:'+alturaGrafico(vis.length)+'px"><canvas id="cChart"></canvas></div></div>';
       desenhaBarras('cChart',
         vis.map(function(c){ return c.nome + (c.partido?'  ('+c.partido+')':''); }),
         vis.map(function(c){ return c.votos; }),
