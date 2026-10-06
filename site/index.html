@@ -914,10 +914,23 @@
   /* ---------------- comparação entre dois candidatos (só Presidente) ---------------- */
   var CMP_A = '#2f5597', CMP_B = '#e8710a';
   var CMP_A_BG = '#d3e1f8', CMP_A_TX = '#1f4690', CMP_B_BG = '#fde0c2', CMP_B_TX = '#b4540a';
-  function cmpAtivo(p){ return p.id === 'presidente_1t_2026' && st.cmpA && st.cmpB && st.cmpA !== st.cmpB; }
+  // vale para toda página com candidatos e votos por região (todos os cargos e anos); a página de "partido" fica de fora
+  function cmpSuporta(p){ return !!(p && !p.pendente && p.vista !== 'partido' && p.tem_regiao && p.candidatos && p.candidatos.length && p.cruzamento); }
+  function cmpAtivo(p){ return cmpSuporta(p) && st.metrica === 'votos' && st.cmpA && st.cmpB && st.cmpA !== st.cmpB; }
+  function cmpCandidatos(p){
+    var L = p.candidatos;
+    var comNum = L.some(function(c){ return c.num; });
+    var dep = /^dep_(federal|estadual)_/.test(p.id);   // nos deputados, número curto = legenda do partido
+    L = L.filter(function(c){
+      if(/^(voto )?(branco|nulo)$/i.test(String(c.nome).trim()) || c.status === 'Branco' || c.status === 'Nulo' || c.status === 'Legenda') return false;
+      if(comNum) return c.num && (!dep || String(c.num).length >= 3);
+      return true;
+    });
+    return L.slice().sort(function(x,y){ return y.votos - x.votos; });
+  }
   function cmpBarHtml(p){
-    if(p.id !== 'presidente_1t_2026') return '';
-    var lista = p.candidatos.filter(function(c){ return c.num; }).sort(function(x,y){ return y.votos - x.votos; });
+    if(!cmpSuporta(p)) return '';
+    var lista = cmpCandidatos(p);
     function opts(sel){
       return '<option value="">Escolha o candidato</option>' + lista.map(function(c){
         return '<option value="'+escAttr(c.nome)+'"'+(sel===c.nome?' selected':'')+'>'+esc(c.nome)+(c.partido?' ('+esc(c.partido)+')':'')+'</option>';
@@ -1011,6 +1024,7 @@
     if(!p){ v.innerHTML='<p>Página não encontrada.</p>'; return; }
     limpaCharts();
     if(p.pendente){ renderPaginaPendente(v, p); return; }
+    if(st.cmpPag !== p.id){ st.cmpA = st.cmpB = null; st.cmpPag = p.id; }   // a comparação é por página
     var k = kpisAtuais(p);
     var perc = k.aptos ? (100*k.comparecimento/k.aptos) : 0;
     var brancos = contaEspecial(p, ['branco','voto branco']);
