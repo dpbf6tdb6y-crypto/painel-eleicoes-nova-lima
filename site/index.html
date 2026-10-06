@@ -619,6 +619,7 @@
     return renderMenu(v);
   }
 
+  function dataBR(s){ var m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : String(s||''); }
   function renderMenu(v){
     v.innerHTML =
       '<div class="capa">'+
@@ -628,6 +629,7 @@
         '<p>Elaborado por: Jucilei Nunes Ferreira</p>'+
         '<p>Contato: 31-99615-0881</p>'+
         '<p>Fonte: TRE-MG</p>'+
+        '<p>Dados de: '+dataBR(D.gerado_em)+' <span style="font-size:12.5px">· 2026: apuração atualizada automaticamente</span></p>'+
         '<p class="dica-menu">Escolha um cargo ou eleição no menu à esquerda.</p>'+
       '</div>';
   }
@@ -2006,7 +2008,7 @@
           '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
           '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'+
           '<span>Sair do sistema</span></button>'+
-        '<div class="rp-fonte">Fonte: '+ esc(D.fonte||'TRE-MG') +'<br>Dados de: '+ esc(D.gerado_em||'') +'</div>';
+        '';
       var s = document.getElementById('btSair');
       if(s) s.onclick = function(){ sair(); };
     }
