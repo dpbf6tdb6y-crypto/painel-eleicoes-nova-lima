@@ -222,7 +222,7 @@
   .cmp-rg{display:grid;grid-template-columns:104px 1fr;gap:8px;align-items:center;margin:0 0 7px;font-size:12.5px;cursor:pointer;
     border-radius:4px;padding:1px 2px}
   .cmp-rg:hover,.cmp-rg.on{background:#f0f3f7}
-  .cmp-rg .l{text-align:right;color:#18212b;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmp-rg .l{text-align:right;color:#18212b;font-weight:400;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cmp-bb{display:flex;align-items:center;gap:6px;height:12px;margin:1px 0}
   .cmp-bb i{display:block;height:100%;border-radius:3px}
   .cmp-bb b{font-size:11.5px}
@@ -1336,7 +1336,7 @@
     meta.data.forEach(function(bar, i){
       var m = String(labels[i]).match(RX_PART), nome = m ? m[1] : String(labels[i]), part = m ? m[2] : '', pw = 0;
       if(part){ ctx.font = '8px ' + FONTE_TICK; pw = ctx.measureText(part).width + 4; }
-      ctx.font = '500 10.5px ' + FONTE_TICK;
+      ctx.font = '12px ' + FONTE_TICK;
       var avail = maxW - pw, n = nome;
       if(ctx.measureText(n).width > avail){ while(n.length > 1 && ctx.measureText(n + '…').width > avail) n = n.slice(0, -1); n += '…'; }
       ctx.fillStyle = '#18212b'; ctx.fillText(n, x - pw, bar.y);
@@ -1361,19 +1361,19 @@
         scales:{
           x:{ ticks:{ callback:function(v){ return fmt.format(v); }, color:'#3d4654', font:{size:10} }, grid:{color:'#eef1f5'} },
           y:{
-            ticks:{ color:'#18212b', font:{size:10.5, weight:'500', family:FONTE_TICK}, autoSkip:false, display:!comPartido,
+            ticks:{ color:'#18212b', font:{size:12, weight:'normal', family:FONTE_TICK}, autoSkip:false, display:!comPartido,
               callback:function(v){ return quebraRotulo(this.getLabelForValue(v)); } },
             grid:{display:false},
             afterFit:function(sc){
               // reserva largura pra MAIOR LINHA já quebrada (mesma fonte do desenho), até 55% do gráfico
               var ctx = sc.chart.ctx; ctx.save();
-              ctx.font = '500 10.5px ' + FONTE_TICK;
+              ctx.font = '12px ' + FONTE_TICK;
               var w = 0;
               if(comPartido){
                 labels.forEach(function(l){
                   var m = String(l).match(RX_PART), nm = m ? m[1] : String(l), pt = m ? m[2] : '', pw = 0;
                   if(pt){ ctx.font = '8px ' + FONTE_TICK; pw = ctx.measureText(pt).width + 4; }
-                  ctx.font = '500 10.5px ' + FONTE_TICK;
+                  ctx.font = '12px ' + FONTE_TICK;
                   w = Math.max(w, ctx.measureText(nm).width + pw);
                 });
               } else
