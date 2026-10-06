@@ -187,6 +187,21 @@
   .reg-card ul{margin:0;padding-left:18px}
   .reg-card li{margin:3px 0}
   .reg-card .mr{font-size:11.5px;color:var(--suave)}
+  /* rodape do menu: usuario + botao Sair */
+  .sidebar .rodape{padding:14px 14px 12px}
+  .rp-user{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .rp-av{flex:none;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--azul),var(--verde));color:#fff;font-weight:700;font-size:13px;letter-spacing:.02em}
+  .rp-nm{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+  .rp-nm small{font-size:10.5px;color:#8ea3c7}
+  .rp-nm b{font-size:13px;color:#fff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .btn-sair{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px 12px;border-radius:9px;cursor:pointer;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:13.5px;font-weight:600;
+    transition:background .15s,border-color .15s,color .15s}
+  .btn-sair:hover{background:#d84a3a;border-color:#d84a3a}
+  .btn-sair:active{transform:scale(.98)}
+  .btn-sair:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .rp-fonte{margin-top:11px;font-size:10.5px;line-height:1.45;color:#7f94b8}
   /* menu lateral no computador: fixo ou recolhido (abre por cima ao clicar no botão) */
   .sidebar .marca{position:relative;padding-right:46px}
   .btn-pin{position:absolute;right:8px;top:12px;width:30px;height:30px;border:0;border-radius:7px;cursor:pointer;
@@ -1984,9 +1999,14 @@
     st.usuario = usuario || null;
     var rp = document.getElementById('rodape');
     if(rp && st.usuario){
-      rp.innerHTML = 'Conectado: <b>'+esc(st.usuario.nome||st.usuario.login)+'</b>'+
-        '<br>Fonte: '+ (D.fonte||'TRE-MG') +'<br>Dados de: '+ (D.gerado_em||'') +
-        '<br><a id="btSair" style="cursor:pointer;text-decoration:underline">Sair</a>';
+      var nomeU = st.usuario.nome || st.usuario.login, ini = String(nomeU).trim().split(/\s+/).slice(0,2).map(function(x){ return x.charAt(0); }).join('').toUpperCase();
+      rp.innerHTML =
+        '<div class="rp-user"><span class="rp-av">'+esc(ini)+'</span><span class="rp-nm"><small>Conectado como</small><b>'+esc(nomeU)+'</b></span></div>'+
+        '<button type="button" class="btn-sair" id="btSair" title="Encerrar a sessão neste navegador">'+
+          '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+          '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'+
+          '<span>Sair do sistema</span></button>'+
+        '<div class="rp-fonte">Fonte: '+ esc(D.fonte||'TRE-MG') +'<br>Dados de: '+ esc(D.gerado_em||'') +'</div>';
       var s = document.getElementById('btSair');
       if(s) s.onclick = function(){ sair(); };
     }
