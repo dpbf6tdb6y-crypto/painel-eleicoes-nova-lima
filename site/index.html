@@ -883,7 +883,7 @@
   function livePinta(){
     var m = document.getElementById('liveMsg'); if(m) m.textContent = liveMsg;
     var b = document.getElementById('btLive');
-    if(b){ b.disabled = liveBusy; b.textContent = liveBusy ? '⏳ '+(liveMsg || 'Atualizando…') : (liveMsg ? '⚠️ '+liveMsg : '🔄 Atualizar do TSE'); }
+    if(b){ b.disabled = liveBusy; b.textContent = liveBusy ? '⏳ '+(liveMsg || 'Atualizando…') : (liveMsg ? '⚠️ '+liveMsg : '🔄 Atualizar TSE'); }
   }
   function liveLiga(v){
     var b = document.getElementById('btLive'); if(!b) { liveAutoLigaDesliga(); return; }
@@ -1018,7 +1018,7 @@
           ' &nbsp;•&nbsp; <b>'+escopo+'</b></div></div>'+
         '<div class="topo-btns">'+
           cmpBarHtml(p)+
-          (LIVE_CFG[p.id] ? '<button class="btn btn-verde" id="btLive">🔄 Atualizar do TSE</button>' : '')+
+          (LIVE_CFG[p.id] ? '<button class="btn btn-verde" id="btLive">🔄 Atualizar TSE</button>' : '')+
           '<button class="btn btn-limpar'+(temAlgumFiltro()?' on':'')+'" id="btLimpar">'+
             (temAlgumFiltro()?'✕ Limpar seleção':'Sem filtros')+'</button>'+
         '</div>'+
@@ -1433,7 +1433,7 @@
       '<div class="rel-base">Base: Votação de deputado estadual - ano 2026</div></div>'+
       '<div class="topo-btns"><button class="btn btn-limpar'+(relOrd.col?' on':'')+'" id="btRelLimpar">'+(relOrd.col?'✕ Limpar ordenação':'Sem ordenação')+'</button></div></div>';
     if(!com.length){
-      v.innerHTML = head + '<div class="escopo-nota">Carregando a apuração… se demorar, abra a página <b>Deputado Estadual (2026)</b> e clique em “Atualizar do TSE”.</div>';
+      v.innerHTML = head + '<div class="escopo-nota">Carregando a apuração… se demorar, abra a página <b>Deputado Estadual (2026)</b> e clique em “Atualizar TSE”.</div>';
       carregaApuracao();
       return;
     }
