@@ -188,13 +188,10 @@
   .reg-card li{margin:3px 0}
   .reg-card .mr{font-size:11.5px;color:var(--suave)}
   /* comparacao entre dois candidatos (Presidente) */
-  .cmp-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--card);border-radius:10px;
-    box-shadow:0 1px 3px rgba(20,40,80,.07);padding:10px 14px;margin-bottom:14px}
-  .cmp-bar .flab{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
-  .cmp-bar .sl{display:flex;align-items:center;gap:6px}
-  .cmp-bar .sw{width:12px;height:12px;border-radius:3px;flex:none}
-  .cmp-bar select{border:1px solid var(--linha);border-radius:7px;padding:5px 8px;font-size:12.5px;background:#fff;max-width:230px}
-  .cmp-bar .vs{font-size:12.5px;color:var(--suave)}
+  .topo-btns .sl{display:flex;align-items:center;gap:6px}
+  .topo-btns .sw{width:12px;height:12px;border-radius:3px;flex:none}
+  .topo-btns select{border:1px solid var(--linha);border-radius:7px;padding:7px 8px;font-size:12.5px;background:#fff;max-width:190px}
+  .topo-btns .vs{font-size:12.5px}
   .cmp-kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
   .cmp-kp .c{background:var(--card);border-radius:10px;padding:8px 12px;box-shadow:0 1px 3px rgba(20,40,80,.07);border-left:4px solid var(--linha)}
   .cmp-kp .r{font-size:11px;color:var(--suave)} .cmp-kp .n{font-size:19px;font-weight:700}
@@ -900,13 +897,10 @@
         return '<option value="'+escAttr(c.nome)+'"'+(sel===c.nome?' selected':'')+'>'+esc(c.nome)+(c.partido?' ('+esc(c.partido)+')':'')+'</option>';
       }).join('');
     }
-    return '<div class="cmp-bar"><span class="flab">Comparar</span>'+
-      '<span class="sl"><span class="sw" style="background:'+CMP_A+'"></span><select id="cmpA">'+opts(st.cmpA)+'</select></span>'+
-      '<span class="vs">contra</span>'+
+    return '<span class="sl"><span class="sw" style="background:'+CMP_A+'"></span><select id="cmpA">'+opts(st.cmpA)+'</select></span>'+
       '<span class="sl"><span class="sw" style="background:'+CMP_B+'"></span><select id="cmpB">'+opts(st.cmpB)+'</select></span>'+
-      ((st.cmpA||st.cmpB)?'<button class="fchip lisa" id="cmpLimpa">limpar comparação</button>':'')+
-      (st.cmpA && st.cmpA===st.cmpB ? '<span class="vs" style="color:#c62828">Escolha dois candidatos diferentes.</span>' : '')+
-      '</div>';
+      ((st.cmpA||st.cmpB)?'<button class="fchip lisa" id="cmpLimpa">limpar</button>':'')+
+      (st.cmpA && st.cmpA===st.cmpB ? '<span class="vs" style="color:#c62828">Escolha dois candidatos diferentes.</span>' : '');
   }
   function cmpLiga(){
     var a = document.getElementById('cmpA'), b = document.getElementById('cmpB'), l = document.getElementById('cmpLimpa');
@@ -1012,13 +1006,13 @@
           ' · Fonte TRE-MG'+(p.tem_partido?' · '+p.candidatos.length+' candidatos':'')+
           ' &nbsp;•&nbsp; <b>'+escopo+'</b></div></div>'+
         '<div class="topo-btns">'+
+          cmpBarHtml(p)+
           (LIVE_CFG[p.id] ? '<button class="btn btn-verde" id="btLive">🔄 Atualizar do TSE</button>' : '')+
           '<button class="btn btn-limpar'+(temAlgumFiltro()?' on':'')+'" id="btLimpar">'+
             (temAlgumFiltro()?'✕ Limpar seleção':'Sem filtros')+'</button>'+
         '</div>'+
       '</div>'+
       liveBarraHtml(p)+
-      cmpBarHtml(p)+
       (temFV ? barraFiltrosVereador(p) : '')+
       (p.id==='senador_2026'
         /* Senador tem 2 votos por eleitor: separa "eleitores" de "votos" para os números não parecerem errados. */
