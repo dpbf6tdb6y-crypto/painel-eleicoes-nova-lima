@@ -187,6 +187,11 @@
   .reg-card ul{margin:0;padding-left:18px}
   .reg-card li{margin:3px 0}
   .reg-card .mr{font-size:11.5px;color:var(--suave)}
+  /* menu sem o bloco do título (mais espaço): só sobra o botão de recolher, no canto da primeira linha */
+  .sidebar .marca{padding:0;height:0;overflow:visible;background:none;font-size:0;line-height:0;color:transparent}
+  .sidebar .marca > *:not(.btn-pin){display:none}
+  .sidebar .btn-pin{top:7px;right:8px;z-index:3;font-size:16px;line-height:1;color:#fff}
+  .nav a[data-rota="menu"]{padding-right:46px}
   /* rodape do menu: usuario + botao Sair */
   .sidebar .rodape{padding:14px 14px 12px}
   .rp-user{display:flex;align-items:center;gap:10px;margin-bottom:11px}
