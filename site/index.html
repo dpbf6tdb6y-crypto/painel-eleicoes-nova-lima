@@ -187,6 +187,25 @@
   .reg-card ul{margin:0;padding-left:18px}
   .reg-card li{margin:3px 0}
   .reg-card .mr{font-size:11.5px;color:var(--suave)}
+  /* comparacao entre dois candidatos (Presidente) */
+  .cmp-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--card);border-radius:10px;
+    box-shadow:0 1px 3px rgba(20,40,80,.07);padding:10px 14px;margin-bottom:14px}
+  .cmp-bar .flab{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
+  .cmp-bar .sl{display:flex;align-items:center;gap:6px}
+  .cmp-bar .sw{width:12px;height:12px;border-radius:3px;flex:none}
+  .cmp-bar select{border:1px solid var(--linha);border-radius:7px;padding:5px 8px;font-size:12.5px;background:#fff;max-width:230px}
+  .cmp-bar .vs{font-size:12.5px;color:var(--suave)}
+  .cmp-kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+  .cmp-kp .c{background:var(--card);border-radius:10px;padding:8px 12px;box-shadow:0 1px 3px rgba(20,40,80,.07);border-left:4px solid var(--linha)}
+  .cmp-kp .r{font-size:11px;color:var(--suave)} .cmp-kp .n{font-size:19px;font-weight:700}
+  .cmp-rg{display:grid;grid-template-columns:104px 1fr;gap:8px;align-items:center;margin:0 0 7px;font-size:12.5px;cursor:pointer;
+    border-radius:4px;padding:1px 2px}
+  .cmp-rg:hover,.cmp-rg.on{background:#f0f3f7}
+  .cmp-rg .l{text-align:right;color:var(--suave);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmp-bb{display:flex;align-items:center;gap:6px;height:12px;margin:1px 0}
+  .cmp-bb i{display:block;height:100%;border-radius:3px}
+  .cmp-bb b{font-size:11.5px}
+  table.tab td.vence{font-weight:700}
   .aviso-boletim{flex:1;min-width:220px;max-width:430px;margin-left:auto;text-align:right;color:#c62828;font-size:12.5px;font-weight:600;line-height:1.35}
   @media(max-width:820px){.aviso-boletim{max-width:none;text-align:left;margin-left:0;flex-basis:100%;order:3;font-size:12px}}
   /* ---------- celular / tablet estreito ---------- */
@@ -289,7 +308,7 @@
   var m2M = D.micro_para_macro;
   var CORES = {azul:'#2f5597', azulClaro:'#5aa9e6', verde:'#46b649', cinza:'#9aa7b5', amarelo:'#f2c200'};
 
-  var st = { rota:'menu', pageId:null, selCand:null, selMacros:[], selMicros:[], selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
+  var st = { cmpA:null, cmpB:null, rota:'menu', pageId:null, selCand:null, selMacros:[], selMicros:[], selPart:null, selStatus:null, metrica:'votos', busca:'', tudo:false, navAbertos:null, usuario:null };
   var acessosEdit = null;    // cópia de trabalho da lista de usuários (tela Acessos)
   var acessosAviso = null;   // mensagem de "salvo/copiado" a mostrar uma vez, no topo da tela Acessos
   var buscaTimer=null;
@@ -870,6 +889,87 @@
     liveAutoLigaDesliga();
   }
 
+  /* ---------------- comparação entre dois candidatos (só Presidente) ---------------- */
+  var CMP_A = '#2f5597', CMP_B = '#e8710a';
+  function cmpAtivo(p){ return p.id === 'presidente_1t_2026' && st.cmpA && st.cmpB && st.cmpA !== st.cmpB; }
+  function cmpBarHtml(p){
+    if(p.id !== 'presidente_1t_2026') return '';
+    var lista = p.candidatos.filter(function(c){ return c.num; }).sort(function(x,y){ return y.votos - x.votos; });
+    function opts(sel){
+      return '<option value="">Escolha o candidato</option>' + lista.map(function(c){
+        return '<option value="'+escAttr(c.nome)+'"'+(sel===c.nome?' selected':'')+'>'+esc(c.nome)+(c.partido?' ('+esc(c.partido)+')':'')+'</option>';
+      }).join('');
+    }
+    return '<div class="cmp-bar"><span class="flab">Comparar</span>'+
+      '<span class="sl"><span class="sw" style="background:'+CMP_A+'"></span><select id="cmpA">'+opts(st.cmpA)+'</select></span>'+
+      '<span class="vs">contra</span>'+
+      '<span class="sl"><span class="sw" style="background:'+CMP_B+'"></span><select id="cmpB">'+opts(st.cmpB)+'</select></span>'+
+      ((st.cmpA||st.cmpB)?'<button class="fchip lisa" id="cmpLimpa">limpar comparação</button>':'')+
+      (st.cmpA && st.cmpA===st.cmpB ? '<span class="vs" style="color:#c62828">Escolha dois candidatos diferentes.</span>' : '')+
+      '</div>';
+  }
+  function cmpLiga(){
+    var a = document.getElementById('cmpA'), b = document.getElementById('cmpB'), l = document.getElementById('cmpLimpa');
+    if(a) a.onchange = function(){ st.cmpA = this.value || null; render(); };
+    if(b) b.onchange = function(){ st.cmpB = this.value || null; render(); };
+    if(l) l.onclick = function(){ st.cmpA = st.cmpB = null; render(); };
+  }
+  // troca os painéis "por região" e "por bairro" pela versão com os dois candidatos
+  function cmpPaineis(p){
+    var A = st.cmpA, B = st.cmpB, mm = {};
+    p.cruzamento.forEach(function(r){
+      if(r.c !== A && r.c !== B) return;
+      var o = mm[r.m] || (mm[r.m] = { a:0, b:0 });
+      if(r.c === A) o.a += r.v; else o.b += r.v;
+    });
+    var ca = p.candidatos.filter(function(c){ return c.nome===A; })[0] || {}, cb = p.candidatos.filter(function(c){ return c.nome===B; })[0] || {};
+    var nomeA = A + (ca.partido?' ('+ca.partido+')':''), nomeB = B + (cb.partido?' ('+cb.partido+')':'');
+    // por macro
+    var mac = {}; MACROS.forEach(function(x){ mac[x] = { a:0, b:0 }; });
+    Object.keys(mm).forEach(function(mi){ var M = m2M[mi]; if(mac[M]){ mac[M].a += mm[mi].a; mac[M].b += mm[mi].b; } });
+    var LM = MACROS.map(function(x){ return { n:x, a:mac[x].a, b:mac[x].b }; }).sort(function(x,y){ return (y.a+y.b) - (x.a+x.b); });
+    var mx = Math.max.apply(null, LM.map(function(r){ return Math.max(r.a, r.b); })) || 1;
+    var ta = LM.reduce(function(s,r){ return s + r.a; }, 0), tb = LM.reduce(function(s,r){ return s + r.b; }, 0);
+    var sw = function(c){ return '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+c+';margin-right:5px"></span>'; };
+    document.getElementById('pnMeio').innerHTML =
+      '<h3>Votos por região <span class="tot">'+LM.length+' regiões</span></h3>'+
+      '<div class="dica">'+sw(CMP_A)+esc(nomeA)+' &nbsp; '+sw(CMP_B)+esc(nomeB)+'. Clique numa região para ver só os bairros dela.</div>'+
+      (st.selMacros.length?'<span class="filtro-ativo" id="fMac">'+areaTexto()+' ✕</span>':'')+
+      LM.map(function(r){
+        return '<div class="cmp-rg'+(macroSel(r.n)?' on':'')+'" data-m="'+escAttr(r.n)+'"><div class="l">'+esc(r.n)+'</div><div>'+
+          '<div class="cmp-bb"><i style="width:'+Math.max(1,86*r.a/mx)+'%;background:'+CMP_A+'"></i><b>'+fmt.format(r.a)+'</b></div>'+
+          '<div class="cmp-bb"><i style="width:'+Math.max(1,86*r.b/mx)+'%;background:'+CMP_B+'"></i><b>'+fmt.format(r.b)+'</b></div></div></div>';
+      }).join('');
+    document.querySelectorAll('#pnMeio .cmp-rg').forEach(function(d){
+      d.onclick = function(){ toggleSel(st.selMacros, d.dataset.m); st.selMicros = []; render(); };
+    });
+    if(st.selMacros.length) document.getElementById('fMac').onclick = function(){ st.selMacros = []; render(); };
+    // por bairro
+    var LB = Object.keys(mm).filter(function(mi){ return noArea(mi); }).map(function(mi){ return { m:mi, a:mm[mi].a, b:mm[mi].b }; })
+      .sort(function(x,y){ return (y.a+y.b) - (x.a+x.b); });
+    var sa = 0, sb = 0;
+    var corpo = LB.map(function(r){
+      sa += r.a; sb += r.b; var d = r.a - r.b;
+      return '<tr class="clic'+(microSel(r.m)?' sel':'')+'" data-micro="'+escAttr(r.m)+'"><td>'+esc(r.m)+'<span class="mrx">'+esc(m2M[r.m]||'')+'</span></td>'+
+        '<td class="num'+(r.a>r.b?' vence':'')+'" style="'+(r.a>r.b?'background:'+CMP_A+'22;color:'+CMP_A:'')+'">'+fmt.format(r.a)+'</td>'+
+        '<td class="num'+(r.b>r.a?' vence':'')+'" style="'+(r.b>r.a?'background:'+CMP_B+'22;color:'+CMP_B:'')+'">'+fmt.format(r.b)+'</td>'+
+        '<td class="num" style="color:var(--suave)">'+(d===0?'0':(d>0?'+':'−')+fmt.format(Math.abs(d)))+'</td></tr>';
+    }).join('');
+    var dt = sa - sb;
+    document.getElementById('pnDir').innerHTML =
+      '<h3>Votos por bairro <span class="tot">'+LB.length+' bairros</span></h3>'+
+      '<div class="dica">Cada candidato na sua cor; o número em destaque marca quem venceu o bairro.</div>'+
+      (st.selMicros.length?'<span class="filtro-ativo" id="fMic">'+areaTexto()+' ✕</span>':'')+
+      '<div class="scrollbox alto"><table class="tab"><thead><tr><th>Micro-região</th>'+
+        '<th class="num" style="color:'+CMP_A+'">'+esc(A)+'</th><th class="num" style="color:'+CMP_B+'">'+esc(B)+'</th><th class="num">Diferença</th></tr></thead>'+
+        '<tbody>'+corpo+'</tbody><tfoot><tr><td>Total</td><td class="num" style="color:'+CMP_A+'">'+fmt.format(sa)+'</td>'+
+        '<td class="num" style="color:'+CMP_B+'">'+fmt.format(sb)+'</td><td class="num">'+(dt>=0?'+':'−')+fmt.format(Math.abs(dt))+'</td></tr></tfoot></table></div>';
+    document.querySelectorAll('#pnDir tr.clic').forEach(function(tr){
+      tr.onclick = function(){ toggleSel(st.selMicros, tr.dataset.micro); st.selMacros = []; render(); };
+    });
+    if(st.selMicros.length) document.getElementById('fMic').onclick = function(){ st.selMicros = []; render(); };
+  }
+
   function renderPaginaPendente(v, p){
     var cargo = p.titulo.replace(/^.*—\s*/, '').replace(/\s*\(\d{4}\)\s*$/, '') || p.titulo;
     v.innerHTML =
@@ -918,6 +1018,7 @@
         '</div>'+
       '</div>'+
       liveBarraHtml(p)+
+      cmpBarHtml(p)+
       (temFV ? barraFiltrosVereador(p) : '')+
       (p.id==='senador_2026'
         /* Senador tem 2 votos por eleitor: separa "eleitores" de "votos" para os números não parecerem errados. */
@@ -1010,7 +1111,7 @@
       desenhaBarras('cChart',
         vis.map(function(c){ return c.nome + (c.partido?'  ('+c.partido+')':''); }),
         vis.map(function(c){ return c.votos; }),
-        vis.map(function(c){ return c.nome===st.selCand?CORES.verde
+        vis.map(function(c){ return (cmpAtivo(p) && c.nome===st.cmpA)?CMP_A : (cmpAtivo(p) && c.nome===st.cmpB)?CMP_B : c.nome===st.selCand?CORES.verde
               : (c.nome==='Branco'||c.nome==='Nulo')?CORES.azulClaro
               : c.status==='Eleito'?CORES.verde
               : (c.status==='Suplente'||c.status==='Legenda')?CORES.cinza
@@ -1073,6 +1174,9 @@
       tr.onclick=function(){ toggleSel(st.selMicros, tr.dataset.micro); st.selMacros=[]; render(); };
     });
     if(st.selMicros.length) document.getElementById('fMic').onclick=function(){ st.selMicros=[]; render(); };
+
+    cmpLiga();
+    if(cmpAtivo(p)) cmpPaineis(p);
 
     /* ----- painel inferior (só na página de partido): vereadores + legenda ----- */
     if(ehPartido && document.getElementById('pnPart')){
