@@ -321,7 +321,7 @@ monta_grupo_cargos(cfg2026)
 # ---------- monta dados.js ----------
 DADOS = {
     "gerado_em": datetime.date.today().isoformat(),
-    "fonte": "TRE-MG — compilado por Jucilei Nunes Ferreira (31-99615-0881)",
+    "fonte": "TSE — compilado por Jucilei Nunes Ferreira (31-99615-0881)",
     "municipio": "Nova Lima / MG",
     "macros_ordem": MACROS_ORDEM,
     "micro_para_macro": {k: v for k, v in micro2macro.items() if k and k.lower() != "nan"},

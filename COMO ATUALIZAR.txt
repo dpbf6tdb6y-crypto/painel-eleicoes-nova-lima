@@ -6,7 +6,7 @@
 Estrutura:
   site/            -> o que fica no ar (index.html, dados.js, chart.umd.min.js)
   _gerador/        -> gerar_dados.py  (recria site/dados.js a partir da planilha)
-  planilhas/       -> Arquivo das eleicoes.xlsx  (fonte dos dados, do TRE-MG)
+  planilhas/       -> Arquivo das eleicoes.xlsx  (fonte dos dados, do TSE)
 
 Login do painel:  usuario jucilei / senha jucilei
 
@@ -26,7 +26,7 @@ ELEICOES 2026 - ja reservado no menu, falta so a planilha
 Deputado Federal e Deputado Estadual. As 6 paginas ja aparecem no menu, em
 "Eleicoes 2026", marcadas "(em breve)" com um aviso de "aguardando resultado".
 
-Quando sair o resultado oficial do TRE-MG, adicione estas abas na MESMA
+Quando sair o resultado oficial do TSE, adicione estas abas na MESMA
 planilha (planilhas\Arquivo das eleicoes.xlsx), com as mesmas colunas que
 as abas equivalentes de 2022 ja tem (nr_secao/Seçao, Nome ou Candidato,
 Votos/Voto, aptos/comparecimento/abstencoes/nominais):
@@ -93,4 +93,4 @@ INFRA
   Servidor    : VPS Hostinger, Caddy do host (/etc/caddy/Caddyfile)
                 bloco  eleicoes.gavix.tech { root * /srv/painel-eleicoes/site ; file_server ... }
   HTTPS       : Let's Encrypt automatico pelo Caddy
-  Fonte       : TRE-MG  -  Elaborado por Jucilei Nunes Ferreira (31-99615-0881)
+  Fonte       : TSE  -  Elaborado por Jucilei Nunes Ferreira (31-99615-0881)
