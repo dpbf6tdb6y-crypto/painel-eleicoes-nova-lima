@@ -5,6 +5,7 @@ Atualiza a apuracao de 2026 (Nova Lima, Zona 194) a partir dos Boletins de Urna 
 e grava site/apuracao.json — o painel abre ja com esse resultado, para todo mundo.
 
 Roda sozinho na VPS (cron, a cada 5 min) — veja _vps/COMO_ATIVAR_APURACAO.txt.
+Faz o 1o turno (site/apuracao.json) e o 2o turno de Presidente (site/apuracao2t.json).
 Cada urna recebida nao muda mais, entao so as secoes novas sao baixadas a cada rodada.
 
 Uso manual:   python3 atualizar_apuracao.py
@@ -100,29 +101,26 @@ def le_bu(b):
     return {"aptos": aptos, "comp": comp or 0, "cargos": cargos}
 
 
-def baixa_secao(sec):
-    t = get(BASE + sec + "/p003220-mg-m48950-z0194-s" + sec + "-aux.jws?nocache=" + str(int(time.time())))
+def baixa_secao(a):
+    sec, base, pre = a
+    t = get(base + sec + "/" + pre + "-mg-m48950-z0194-s" + sec + "-aux.jws?nocache=" + str(int(time.time())))
     if not t:
         return sec, None
     try:
-        hs = [h for h in jws(t).get("hashes", []) if any(a["tp"] == "bu" for a in h.get("arq", []))]
+        hs = [h for h in jws(t).get("hashes", []) if any(x["tp"] == "bu" for x in h.get("arq", []))]
         if not hs:
             return sec, None
         h = hs[-1]
-        nm = [a["nm"] for a in h["arq"] if a["tp"] == "bu"][0]
-        bu = get(BASE + sec + "/" + h["hash"] + "/" + nm)
+        nm = [x["nm"] for x in h["arq"] if x["tp"] == "bu"][0]
+        bu = get(base + sec + "/" + h["hash"] + "/" + nm)
         return sec, (le_bu(bu) if bu else None)
     except Exception as ex:
         print("  erro na secao", sec, ex)
         return sec, None
 
 
-ZONA_ELE = {1: "6257", 3: "6259", 5: "6259", 6: "6259", 7: "6259"}
-
-
-def zona_cargo(cod):
+def zona_cargo(cod, ele):
     """Totais da zona (apuracao oficial do TSE, costuma estar a frente dos boletins por urna)."""
-    ele = ZONA_ELE[cod]
     url = ("https://resultados.tse.jus.br/oficial/ele2026/%s/dados/mg/mg48950-z0194-c000%d-e00%s-u.jws?nocache=%d"
            % (ele, cod, ele, int(time.time())))
     b = get(url)
@@ -143,37 +141,67 @@ def zona_cargo(cod):
             "nu": int(v.get("vn") or 0), "cand": cand, "leg": leg}
 
 
-def main():
+def pleito_da_eleicao(ele, padrao):
+    """Descobre no config do TSE em qual 'pleito' (pasta arquivo-urna) a eleicao esta."""
+    try:
+        b = get("https://resultados.tse.jus.br/oficial/comum/config/ele-c.jws?nocache=%d" % int(time.time()))
+        for pl in jws(b)["pl"]:
+            if any(str(e.get("cd")) == ele for e in pl.get("e", [])):
+                return str(pl["cd"])
+    except Exception as ex:
+        print("  nao consegui ler o config do TSE:", ex)
+    return padrao
+
+
+def rodar(arquivo, pleito, zonas, extra=None):
+    """zonas: {codigo do cargo: codigo da eleicao}. Grava site/<arquivo>."""
+    saida = os.path.join(SITE, arquivo)
+    base = "https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/%s/dados/mg/48950/0194/" % pleito
+    pre = "p00" + pleito
     txt = open(os.path.join(SITE, "secoes.js"), encoding="utf-8").read()
     secoes = [s["s"] for s in json.loads(txt[txt.index("window.SECOES =") + 15:].strip().rstrip(";"))]
     atual = {}
-    if os.path.exists(SAIDA):
+    if os.path.exists(saida):
         try:
-            atual = json.load(open(SAIDA, encoding="utf-8")).get("secoes", {})
+            atual = json.load(open(saida, encoding="utf-8")).get("secoes", {})
         except Exception:
             atual = {}
-    pend = [s for s in secoes if s not in atual]
+    pend = [(s, base, pre) for s in secoes if s not in atual]
     novas = 0
     with ThreadPoolExecutor(max_workers=12) as ex:
         for sec, d in ex.map(baixa_secao, pend):
             if d:
                 atual[sec] = d; novas += 1
     zona = {}
-    for cod in ZONA_ELE:
+    for cod, ele in zonas.items():
         try:
-            z = zona_cargo(cod)
+            z = zona_cargo(cod, ele)
             if z:
                 zona[str(cod)] = z
         except Exception as ex:
             print("  erro na zona do cargo", cod, ex)
     out = {"zona": zona, "gerado_ts": int(time.time()), "gerado_em": time.strftime("%Y-%m-%d %H:%M:%S"), "total": len(secoes),
-           "recebidas": len(atual), "secoes": atual}
-    tmp = SAIDA + ".tmp"
+           "recebidas": len(atual), "secoes": atual, "pleito": pleito}
+    if extra:
+        out.update(extra)
+    tmp = saida + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, separators=(",", ":"))
-    os.replace(tmp, SAIDA)
-    zc = zona.get("1", {})
-    print(f"{time.strftime('%d/%m %H:%M:%S')}  +{novas} novas · {len(atual)} de {len(secoes)} boletins · zona: {zc.get('secApur', '?')} secoes apuradas · {os.path.getsize(SAIDA)//1024} KB")
+    os.replace(tmp, saida)
+    cod0 = str(list(zonas)[0])
+    zc = zona.get(cod0, {})
+    print(f"{time.strftime('%d/%m %H:%M:%S')}  {arquivo}: +{novas} novas · {len(atual)} de {len(secoes)} boletins · "
+          f"zona: {zc.get('secApur', '?')} secoes apuradas · {os.path.getsize(saida)//1024} KB")
+
+
+def main():
+    # 1o turno
+    rodar("apuracao.json", "3220", {1: "6257", 3: "6259", 5: "6259", 6: "6259", 7: "6259"})
+    # 2o turno (Presidente): o pleito dos boletins e descoberto no config do TSE
+    try:
+        rodar("apuracao2t.json", pleito_da_eleicao("6258", "3221"), {1: "6258"})
+    except Exception as ex:
+        print("  2o turno: erro", ex)
 
 
 if __name__ == "__main__":

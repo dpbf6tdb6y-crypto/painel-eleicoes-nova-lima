@@ -22,6 +22,7 @@ BASE = "https://resultados.tse.jus.br/oficial/ele2026/{e}/dados/mg/mg48950-z0194
 # aba na planilha, eleicao no TSE, codigo do cargo, nome do cargo, tem legenda de partido
 CARGOS = [
     ("5 - Presidente 1 turno 2026", "6257", "0001", "Presidente",        False, 1),
+    ("6 - Presidente 2 turno 2026", "6258", "0001", "Presidente",        False, 2),
     ("Governador 2026",             "6259", "0003", "Governador",        False, 1),
     ("3 Senador 2026",              "6259", "0005", "Senador",           False, 1),
     ("2 Deputado Federal 2026",     "6259", "0006", "Deputado Federal",  True,  1),

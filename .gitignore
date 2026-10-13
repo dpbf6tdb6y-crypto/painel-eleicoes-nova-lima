@@ -6,3 +6,5 @@ site/*.b64.txt
 site/acessos.json
 site/apuracao.json
 site/apuracao.json.tmp
+site/apuracao2t.json
+site/apuracao2t.json.tmp

@@ -691,7 +691,8 @@
   // que está no dados.js. O detalhe por região/seção vem depois, da importação das seções.
   var LIVE_CFG = {
     presidente_1t_2026: ['6257','0001'], governador_2026: ['6259','0003'], senador_2026: ['6259','0005'],
-    dep_federal_2026: ['6259','0006'], dep_estadual_2026: ['6259','0007']
+    dep_federal_2026: ['6259','0006'], dep_estadual_2026: ['6259','0007'],
+    presidente_2t_2026: ['6258','0001']
   };
   var liveTimer = null, liveAuto = false, liveBusy = false, liveMsg = '';
   function liveUrl(id){ var c = LIVE_CFG[id]; return 'https://resultados.tse.jus.br/oficial/ele2026/'+c[0]+'/dados/mg/mg48950-z0194-c'+c[1]+'-e00'+c[0]+'-u.jws'; }
@@ -720,6 +721,10 @@
   var CARGO_COD = { presidente_1t_2026:1, governador_2026:3, senador_2026:5, dep_federal_2026:6, dep_estadual_2026:7 };
   var secCache = {};   // '0005' -> { aptos, comp, cargos:{ 1:[{t,q,p,n}], ... } }   (BU recebido nunca muda)
   var BU_BASE = 'https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/dados/mg/48950/0194/';
+  // 2º turno (Presidente): eleição 6258; os boletins ficam em outro "pleito" (o servidor informa o código certo)
+  var TURNO2 = { presidente_2t_2026: { cod:1, ele:'6258' } };
+  var secCache2 = {}, zonaCache2 = {}, PLEITO2 = '3221';
+  function emTurno2(p){ return !!(p && TURNO2[p.id]); }
   // leitor mínimo de ASN.1 BER (formato do BU)
   function berLe(b, s, e){
     var out = [], i = s;
@@ -762,15 +767,17 @@
     return { aptos:aptos, comp:comp||0, cargos:cargos };
   }
   // baixa o BU de uma seção; devolve null se o TSE ainda não recebeu
-  function buBaixa(sec){
-    return fetch(BU_BASE+sec+'/p003220-mg-m48950-z0194-s'+sec+'-aux.jws?nocache='+Date.now(), { cache:'no-store' })
+  function buBaixa(sec, t2){
+    var base = t2 ? 'https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/'+PLEITO2+'/dados/mg/48950/0194/' : BU_BASE;
+    var pre = t2 ? 'p00'+PLEITO2 : 'p003220';
+    return fetch(base+sec+'/'+pre+'-mg-m48950-z0194-s'+sec+'-aux.jws?nocache='+Date.now(), { cache:'no-store' })
       .then(function(r){ return r.ok ? r.text() : null; })
       .then(function(tx){
         if(!tx) return null;
         var j = liveDecode(tx), hs = (j.hashes||[]).filter(function(h){ return (h.arq||[]).some(function(a){ return a.tp==='bu'; }); });
         if(!hs.length) return null;
         var h = hs[hs.length-1], nm = h.arq.filter(function(a){ return a.tp==='bu'; })[0].nm;
-        return fetch(BU_BASE+sec+'/'+h.hash+'/'+nm, { cache:'no-store' })
+        return fetch(base+sec+'/'+h.hash+'/'+nm, { cache:'no-store' })
           .then(function(r){ return r.ok ? r.arrayBuffer() : null; })
           .then(function(ab){ return ab ? buLe(new Uint8Array(ab)) : null; });
       })
@@ -800,12 +807,12 @@
   }
   function liveAplicaSecoes(p){
     garanteEspeciais(p);
-    var cod = CARGO_COD[p.id];
+    var t2 = emTurno2(p), cod = t2 ? TURNO2[p.id].cod : CARGO_COD[p.id], SC = t2 ? secCache2 : secCache;
     var s2m = {}; (window.SECOES||[]).forEach(function(s){ if(s.micro && !/^A /.test(s.micro)) s2m[s.s] = s.micro; });
     var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; c.votos = 0; });
     var acc = {}, km = {}, T = { a:0, c:0, n:0, br:0, nu:0 }, nSec = 0;
-    Object.keys(secCache).forEach(function(sec){
-      var d = secCache[sec], vs = d.cargos[cod]; if(!vs) return;
+    Object.keys(SC).forEach(function(sec){
+      var d = SC[sec], vs = d.cargos[cod]; if(!vs) return;
       nSec++;
       var nom = 0, micro = s2m[sec];
       vs.forEach(function(x){
@@ -843,18 +850,26 @@
              aptos:(+e.est||0) || (+e.te||0), comp:+e.c||0, abst:+e.a||0, nom:+v.vnom||0, br:+v.vb||0, nu:+v.vn||0, cand:cand, leg:leg };
   }
   function zonaBaixa(){
-    return Promise.all(Object.keys(CARGO_COD).map(function(id){
+    var t2 = Object.keys(TURNO2).map(function(id){
+      var c = TURNO2[id];
+      var u = 'https://resultados.tse.jus.br/oficial/ele2026/'+c.ele+'/dados/mg/mg48950-z0194-c000'+c.cod+'-e00'+c.ele+'-u.jws';
+      return fetch(u+'?nocache='+Date.now(), { cache:'no-store' })
+        .then(function(r){ return r.ok ? r.text() : null; })
+        .then(function(tx){ if(tx) zonaCache2[c.cod] = zonaCompacta(liveDecode(tx)); })
+        .catch(function(){});
+    });
+    return Promise.all(t2.concat(Object.keys(CARGO_COD).map(function(id){
       var cod = CARGO_COD[id];
       return fetch(zonaUrlCargo(cod)+'?nocache='+Date.now(), { cache:'no-store' })
         .then(function(r){ return r.ok ? r.text() : null; })
         .then(function(tx){ if(tx) zonaCache[cod] = zonaCompacta(liveDecode(tx)); })
         .catch(function(){});
-    }));
+    })));
   }
   // junta as duas fontes: totais da zona (mais atuais) + região/bairro dos boletins já liberados
   function aplicaTudo(p){
     garanteEspeciais(p);
-    var cod = CARGO_COD[p.id], zc = zonaCache[cod], nbu = Object.keys(secCache).length;
+    var t2 = emTurno2(p), cod = t2 ? TURNO2[p.id].cod : CARGO_COD[p.id], zc = (t2 ? zonaCache2 : zonaCache)[cod], nbu = Object.keys(t2 ? secCache2 : secCache).length;
     if(nbu) liveAplicaSecoes(p);
     if(zc && zc.secApur > nbu){
       var por = {}; p.candidatos.forEach(function(c){ if(c.num) por[c.num] = c; });
@@ -868,29 +883,53 @@
       _metaCache = {};
     }
   }
-  function liveAplicaTodas(){ Object.keys(CARGO_COD).forEach(function(id){ var q = pg(id); if(q) aplicaTudo(q); }); }
+  function liveAplicaTodas(){ Object.keys(CARGO_COD).concat(Object.keys(TURNO2)).forEach(function(id){ var q = pg(id); if(q && !q.pendente) aplicaTudo(q); }); }
 
   function liveAtualiza(){
     var p = pg(st.pageId);
     if(!p || !LIVE_CFG[p.id] || liveBusy) return;
     liveBusy = true; liveMsg = 'Consultando o TSE…'; livePinta();
-    var pend = (window.SECOES||[]).map(function(s){ return s.s; }).filter(function(s){ return !secCache[s]; });
+    var t2 = emTurno2(p), SC = t2 ? secCache2 : secCache;
+    var pend = (window.SECOES||[]).map(function(s){ return s.s; }).filter(function(s){ return !SC[s]; });
     var feitas = 0;
     Promise.all([
       zonaBaixa(),
       pool(pend, 12, function(sec){
-        return buBaixa(sec).then(function(d){ if(d) secCache[sec] = d; feitas++; liveMsg = 'Consultando o TSE… '+feitas+'/'+pend.length; livePinta(); });
+        return buBaixa(sec, t2).then(function(d){ if(d) SC[sec] = d; feitas++; liveMsg = 'Consultando o TSE… '+feitas+'/'+pend.length; livePinta(); });
       })
     ]).then(function(){
-      if(!Object.keys(secCache).length && !Object.keys(zonaCache).length) throw new Error('o TSE ainda não publicou nada');
+      if(!Object.keys(SC).length && !Object.keys(t2 ? zonaCache2 : zonaCache).length) throw new Error('o TSE ainda não publicou nada');
       liveAplicaTodas(); liveMsg = ''; liveBusy = false; render();
     }).catch(function(e){ liveMsg = 'Não consegui atualizar: ' + e.message; liveBusy = false; livePinta(); });
   }
 
   // Abre já com a última apuração que o servidor guardou (site/apuracao.json, atualizado de 5 em 5 min
   // por _vps/atualizar_apuracao.py) — assim ninguém entra com tudo zerado.
-  var apuracaoTimer = null, apuracaoChave = '';
+  var apuracaoTimer = null, apuracaoChave = '', apuracaoChave2 = '';
+  function carregaApuracao2T(){
+    fetch('apuracao2t.json?_=' + Date.now(), { cache:'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if(!j) return;
+        if(j.pleito) PLEITO2 = String(j.pleito);
+        Object.keys(j.secoes||{}).forEach(function(sec){
+          if(secCache2[sec]) return;
+          var d = j.secoes[sec], cg = {};
+          Object.keys(d.cargos).forEach(function(c){ cg[c] = d.cargos[c].map(function(a){ return { t:a[0], q:a[1], p:a[2], n:a[3] }; }); });
+          secCache2[sec] = { aptos:d.aptos, comp:d.comp, cargos:cg };
+        });
+        Object.keys(j.zona||{}).forEach(function(c){ zonaCache2[c] = j.zona[c]; });
+        var chave = Object.keys(secCache2).length + '|' + (j.gerado_ts||0);
+        if(chave === apuracaoChave2) return;
+        apuracaoChave2 = chave;
+        Object.keys(TURNO2).forEach(function(id){ var q = pg(id); if(q && !q.pendente) aplicaTudo(q); });
+        var h = j.gerado_ts ? new Date(j.gerado_ts * 1000).toLocaleTimeString('pt-BR') : '';
+        Object.keys(TURNO2).forEach(function(id){ var q = pg(id); if(q && q.live && h) q.live.servidor = h; });
+        if(st.rota === 'pagina' && TURNO2[st.pageId]) render();
+      }).catch(function(){});
+  }
   function carregaApuracao(){
+    carregaApuracao2T();
     fetch('apuracao.json?_=' + Date.now(), { cache:'no-store' })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(j){
